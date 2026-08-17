@@ -8,6 +8,27 @@
       "when": 1786714547623,
       "tag": "0000_sad_black_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786865744337,
+      "tag": "0001_spotty_songbird",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786866118898,
+      "tag": "0002_abandoned_ironclad",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786909158026,
+      "tag": "0003_rides",
+      "breakpoints": true
     }
   ]
 }

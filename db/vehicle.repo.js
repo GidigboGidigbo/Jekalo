@@ -1,0 +1,30 @@
+import { eq } from "drizzle-orm";
+import { db } from "./index.js";
+import { vehicle } from "./schema.js";
+
+export async function registerVehicle(vehicle, driver_id) {
+    const [row] = await db.insert(vehicle).values({ ...vehicle, driver_id }).returning();
+    return row;
+}
+
+export async function updateVehicleDetails(id, driver_id, fields) {
+    const [row] = await db
+      .update(vehicle)
+      .set(fields)
+      .where(and(eq(vehicle.id, id), eq(vehicle.driver_id, driver_id)))
+      .returning();
+    return row;
+}
+
+export async function getDriverVehicles(driver_id) {
+    const rows = await db
+      .select()
+      .from(vehicle)
+      .where(eq(vehicle.driver_id, driver_id));
+    return rows;
+}
+
+export async function getVehicle(id) {
+    const [row] = await db.select().from(vehicle).where(eq(vehicle.id, id)).limit(1);
+    return row;
+}
