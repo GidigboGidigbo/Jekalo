@@ -1,6 +1,6 @@
-import { eq, count } from "drizzle-orm";
-import { db } from ".";
-import { rides } from "./schema";
+import { eq, count, and, sql } from "drizzle-orm";
+import { db } from "./index.js";
+import { rides } from "./schema.js";
 
 export async function createRide(driver_id, fields) {
   const { from_lat, from_long, to_lat, to_long, ...rest } = fields;
@@ -35,4 +35,22 @@ export async function updateRideStatus(id, driver_id, status) {
     .where(eq(rides.id, id))
     .returning();
   return row;
+}
+
+export async function findMatchingRides(originLat, originLng, destLat, destLng, radiusKm = 3) {
+  const radiusMeters = radiusKm * 1000;
+  const originPoint = sql`ST_SetSRID(ST_MakePoint(${originLng}, ${originLat}), 4326)::geography`;
+  const destPoint = sql`ST_SetSRID(ST_MakePoint(${destLng}, ${destLat}), 4326)::geography`;
+
+  return db
+    .select()
+    .from(rides)
+    .where(
+      and(
+        eq(rides.status, "PENDING"),
+        sql`ST_DWithin(${rides.from_location}::geography, ${originPoint}, ${radiusMeters})`,
+        sql`ST_DWithin(${rides.to_location}::geography, ${destPoint}, ${radiusMeters})`,
+      ),
+    )
+    .orderBy(sql`ST_Distance(${rides.from_location}::geography, ${originPoint})`);
 }

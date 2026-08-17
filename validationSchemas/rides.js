@@ -17,3 +17,11 @@ export const createRideSchema = z.object({
 export const updateRideStatusSchema = z.object({
   status: z.enum(["STARTED", "COMPLETED", "CANCELLED"], { error: "Status is required." }),
 });
+
+export const searchRidesSchema = z.object({
+  from_lat: z.number({ error: "From latitude is required." }).min(-90).max(90),
+  from_long: z.number({ error: "From longitude is required." }).min(-180).max(180),
+  to_lat: z.number({ error: "To latitude is required." }).min(-90).max(90),
+  to_long: z.number({ error: "To longitude is required." }).min(-180).max(180),
+  radius: z.number({ error: "Radius is required." }).min(0.1).max(50).optional().default(3),
+});

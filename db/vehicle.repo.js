@@ -1,9 +1,9 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "./index.js";
 import { vehicle } from "./schema.js";
 
-export async function registerVehicle(vehicle, driver_id) {
-    const [row] = await db.insert(vehicle).values({ ...vehicle, driver_id }).returning();
+export async function registerVehicle(fields, driver_id) {
+    const [row] = await db.insert(vehicle).values({ ...fields, driver_id }).returning();
     return row;
 }
 
