@@ -25,3 +25,21 @@ export const searchRidesSchema = z.object({
   to_long: z.number({ error: "To longitude is required." }).min(-180).max(180),
   radius: z.number({ error: "Radius is required." }).min(0.1).max(50).optional().default(3),
 });
+
+export const createBookingSchema = z.object({
+  seats: z
+    .number({ error: "Seats must be a number." })
+    .int("Seats must be a whole number.")
+    .min(1, "Seats must be at least 1.")
+    .max(10, "Seats cannot exceed 10 per booking.")
+    .optional()
+    .default(1),
+});
+
+export const updateBookingSchema = z.object({
+  seats: z
+    .number({ error: "Seats must be a number." })
+    .int("Seats must be a whole number.")
+    .min(1, "Seats must be at least 1 — to remove your booking, cancel it instead.")
+    .max(10, "Seats cannot exceed 10 per booking."),
+});

@@ -1,0 +1,2 @@
+ALTER TABLE "rental_listings" ADD COLUMN "start_date_time" timestamp with time zone NOT NULL;--> statement-breakpoint
+ALTER TABLE "rental_listings" ADD COLUMN "end_date_time" timestamp with time zone NOT NULL;

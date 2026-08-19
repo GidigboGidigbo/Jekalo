@@ -3,6 +3,7 @@ import userRoutes from "./routes/users.js";
 import vehicleRoutes from "./routes/vehicles.js";
 import addressRoutes from "./routes/addresses.js";
 import rideRoutes from "./routes/rides.js";
+import rentalRoutes from "./routes/rentals.js";
 import { pool, assertDatabaseConnection } from "./db/index.js";
 
 const app = express();
@@ -14,6 +15,7 @@ app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/vehicles", vehicleRoutes);
 app.use("/api/v1/addresses", addressRoutes);
 app.use("/api/v1/rides", rideRoutes);
+app.use("/api/v1/rentals", rentalRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

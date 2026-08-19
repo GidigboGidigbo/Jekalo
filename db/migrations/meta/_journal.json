@@ -29,6 +29,34 @@
       "when": 1786909158026,
       "tag": "0003_rides",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786909158027,
+      "tag": "0004_rename_vehicle_columns",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787063178889,
+      "tag": "0005_loving_chronomancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787140445505,
+      "tag": "0006_rental_listings",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787140928160,
+      "tag": "0007_rental_listing_dates",
+      "breakpoints": true
     }
   ]
 }

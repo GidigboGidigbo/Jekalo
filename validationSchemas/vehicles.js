@@ -11,13 +11,17 @@ export const registerVehicleSchema = z.object({
   license_plate_number: z.string({ error: "License plate number is required." }).min(1),
 });
 
-export const updateVehicleSchema = z.object({
-  make: z.string().min(1).optional(),
-  model: z.string().min(1).optional(),
-  manufacturing_year: z.string().min(1).optional(),
-  color: z.string().min(1).optional(),
-  body_type: z.string().min(1).optional(),
-  pictures: z.array(z.string()).min(1).optional(),
-  seating_capacity: z.number().min(1).optional(),
-  license_plate_number: z.string().min(1).optional(),
-});
+export const updateVehicleSchema = z
+  .object({
+    make: z.string().min(1).optional(),
+    model: z.string().min(1).optional(),
+    manufacturing_year: z.string().min(1).optional(),
+    color: z.string().min(1).optional(),
+    body_type: z.string().min(1).optional(),
+    pictures: z.array(z.string()).min(1).optional(),
+    seating_capacity: z.number().min(1).optional(),
+    license_plate_number: z.string().min(1).optional(),
+  })
+  .refine((fields) => Object.keys(fields).length > 0, {
+    message: "At least one vehicle field is required.",
+  });
