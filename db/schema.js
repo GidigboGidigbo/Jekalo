@@ -64,6 +64,37 @@ export const rentalListings = pgTable("rental_listings", {
   index("rental_listing_owner_index").on(rentalListings.owner_id),
 ]);
 
+export const RENTAL_BOOKING_STATUS = {
+  CONFIRMED: "confirmed",
+  CANCELLED: "cancelled",
+  COMPLETED: "completed",
+};
+Object.freeze(RENTAL_BOOKING_STATUS);
+const RENTAL_BOOKING_STATUS_ENUM = pgEnum(
+  "rental_booking_status",
+  Object.values(RENTAL_BOOKING_STATUS),
+);
+
+export const rentalBookings = pgTable("rental_bookings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  listing_id: uuid("listing_id").notNull().references(() => rentalListings.id),
+  renter_id: uuid("renter_id").notNull().references(() => users.id),
+  start_date_time: timestamp("start_date_time", { withTimezone: true }).notNull(),
+  end_date_time: timestamp("end_date_time", { withTimezone: true }).notNull(),
+  total_amount_ngn: numeric("total_amount_ngn", { precision: 12, scale: 2 }).notNull(),
+  security_deposit_ngn: numeric("security_deposit_ngn", { precision: 12, scale: 2 }).notNull(),
+  status: RENTAL_BOOKING_STATUS_ENUM("status").notNull().default("confirmed"),
+  created_at: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updated_at: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (rentalBookings) => [
+  index("rental_booking_listing_dates_index").on(
+    rentalBookings.listing_id,
+    rentalBookings.start_date_time,
+    rentalBookings.end_date_time,
+  ),
+  index("rental_booking_renter_index").on(rentalBookings.renter_id),
+]);
+
 export const RIDE_STATUS = {
   PENDING: "PENDING",
   STARTED: "STARTED",

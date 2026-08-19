@@ -81,3 +81,16 @@ export const searchRentalListingsSchema = z
 export const rentalListingIdSchema = z.object({
   id: z.uuid("Rental listing ID must be a valid UUID."),
 });
+
+export const createRentalBookingSchema = z
+  .object({
+    start_date_time: dateTime,
+    end_date_time: dateTime,
+  })
+  .refine(
+    (fields) => new Date(fields.end_date_time).getTime() > new Date(fields.start_date_time).getTime(),
+    {
+      path: ["end_date_time"],
+      message: "End date and time must be after the start date and time.",
+    },
+  );

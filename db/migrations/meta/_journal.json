@@ -57,6 +57,13 @@
       "when": 1787140928160,
       "tag": "0007_rental_listing_dates",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787171544563,
+      "tag": "0008_rental_bookings",
+      "breakpoints": true
     }
   ]
 }

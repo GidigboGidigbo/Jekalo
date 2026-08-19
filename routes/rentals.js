@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/requireAuth.js";
 import { validate } from "../middleware/validate.js";
 import {
   createRentalListingSchema,
+  createRentalBookingSchema,
   searchRentalListingsSchema,
   updateRentalListingSchema,
 } from "../validationSchemas/rentals.js";
@@ -14,6 +15,7 @@ import {
   updateRentalListing,
   deleteRentalListing,
 } from "../db/rental_listings.repo.js";
+import { createRentalBooking } from "../db/rental_bookings.repo.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -64,6 +66,31 @@ router.get("/listings/search", async (req, res) => {
   const listings = await searchRentalListings(req.user.id, result.data);
   return res.status(200).json(listings);
 });
+
+// Create a booking for a particular rental listing
+// TODO: Get bookings (for a rental, for a user)
+// Update a user's booking for a listing
+// Delete a user's booking for a listing
+router.post(
+  "/listings/:id/bookings",
+  validate(createRentalBookingSchema, "Invalid rental booking data."),
+  async (req, res) => {
+    const result = await createRentalBooking(req.user.id, req.params.id, req.body);
+    const errors = {
+      NOT_FOUND: [404, "RESOURCE_NOT_FOUND", "Rental listing not found."],
+      OWNER_CANNOT_BOOK: [422, "BUSINESS_RULE_VIOLATION", "You cannot book your own rental listing."],
+      LISTING_UNAVAILABLE: [422, "BUSINESS_RULE_VIOLATION", "This rental listing is not available."],
+      OUTSIDE_LISTING_WINDOW: [422, "BUSINESS_RULE_VIOLATION", "The requested dates are outside the listing availability window."],
+      MINIMUM_DURATION: [422, "BUSINESS_RULE_VIOLATION", "The requested rental does not meet the minimum duration."],
+      DATE_CONFLICT: [409, "STATE_CONFLICT", "The rental listing is already booked for part of those dates."],
+    };
+    const error = errors[result.reason];
+    if (error) {
+      return res.status(error[0]).json({ error: { code: error[1], message: error[2] } });
+    }
+    return res.status(201).json(result.booking);
+  },
+);
 
 // To get a particular listing by a user
 router.get("/listings/:id", async (req, res) => {
