@@ -30,9 +30,9 @@ function pointToDatabase(point) {
 
 function toDatabaseFields(fields) {
   const values = { ...fields };
-  if (values.pickup_location) values.pickup_location = pointToDatabase(values.pickup_location);
-  if (values.start_date_time) values.start_date_time = new Date(values.start_date_time);
-  if (values.end_date_time) values.end_date_time = new Date(values.end_date_time);
+  if (values.pickupLocation) values.pickupLocation = pointToDatabase(values.pickupLocation);
+  if (values.startDateTime) values.startDateTime = new Date(values.startDateTime);
+  if (values.endDateTime) values.endDateTime = new Date(values.endDateTime);
   return values;
 }
 
@@ -40,8 +40,8 @@ function toDatabaseFields(fields) {
 // vehicle to put up is owned by the user. The rental starts with default
 // status of pending.
 export async function createRentalListing(ownerId, fields) {
-  const startDateTime = new Date(fields.start_date_time);
-  const endDateTime = new Date(fields.end_date_time);
+  const startDateTime = new Date(fields.startDateTime);
+  const endDateTime = new Date(fields.endDateTime);
   if (endDateTime.getTime() - startDateTime.getTime() < minimumRentalDurationMs) {
     return { reason: "INVALID_DATE_RANGE" };
   }
@@ -49,7 +49,7 @@ export async function createRentalListing(ownerId, fields) {
   const [ownedVehicle] = await db
     .select({ id: vehicle.id })
     .from(vehicle)
-    .where(and(eq(vehicle.id, fields.vehicle_id), eq(vehicle.driver_id, ownerId)))
+    .where(and(eq(vehicle.id, fields.vehicleId), eq(vehicle.driverId, ownerId)))
     .limit(1);
 
   if (!ownedVehicle) return { reason: "VEHICLE_NOT_OWNED" };
@@ -58,7 +58,7 @@ export async function createRentalListing(ownerId, fields) {
     .insert(rentalListings)
     .values({
       ...toDatabaseFields(fields),
-      owner_id: ownerId,
+      ownerId,
       status: RENTAL_LISTING_STATUS.PENDING,
     })
     .returning();
@@ -70,7 +70,7 @@ export async function getRentalListings(ownerId) {
   return db
     .select()
     .from(rentalListings)
-    .where(eq(rentalListings.owner_id, ownerId));
+    .where(eq(rentalListings.ownerId, ownerId));
 }
 
 // searchRentalListings allows searching listings based on start and end date
@@ -85,20 +85,20 @@ export async function getRentalListings(ownerId) {
 // that returned listings are withiin the price range specified for the search
 export async function searchRentalListings(userId, filters) {
   const conditions = [
-    ne(rentalListings.owner_id, userId),
+    ne(rentalListings.ownerId, userId),
     inArray(rentalListings.status, [
       RENTAL_LISTING_STATUS.PENDING,
       RENTAL_LISTING_STATUS.RETURNED,
     ]),
-    lte(rentalListings.start_date_time, new Date(filters.start_date_time)),
-    gte(rentalListings.end_date_time, new Date(filters.end_date_time)),
+    lte(rentalListings.startDateTime, new Date(filters.startDateTime)),
+    gte(rentalListings.endDateTime, new Date(filters.endDateTime)),
   ];
 
-  if (filters.min_daily_rate_ngn !== undefined) {
-    conditions.push(gte(rentalListings.daily_rate_ngn, String(filters.min_daily_rate_ngn)));
+  if (filters.minDailyRate !== undefined) {
+    conditions.push(gte(rentalListings.dailyRate, filters.minDailyRate));
   }
-  if (filters.max_daily_rate_ngn !== undefined) {
-    conditions.push(lte(rentalListings.daily_rate_ngn, String(filters.max_daily_rate_ngn)));
+  if (filters.maxDailyRate !== undefined) {
+    conditions.push(lte(rentalListings.dailyRate, filters.maxDailyRate));
   }
 
   return db
@@ -112,7 +112,7 @@ export async function getRentalListing(id, ownerId) {
   const [listing] = await db
     .select()
     .from(rentalListings)
-    .where(and(eq(rentalListings.id, id), eq(rentalListings.owner_id, ownerId)))
+    .where(and(eq(rentalListings.id, id), eq(rentalListings.ownerId, ownerId)))
     .limit(1);
   return listing;
 }
@@ -124,12 +124,12 @@ export async function updateRentalListing(id, ownerId, fields) {
   const listing = await getRentalListing(id, ownerId);
   if (!listing) return { reason: "NOT_FOUND" };
 
-  const startDateTime = fields.start_date_time
-    ? new Date(fields.start_date_time)
-    : listing.start_date_time;
-  const endDateTime = fields.end_date_time
-    ? new Date(fields.end_date_time)
-    : listing.end_date_time;
+  const startDateTime = fields.startDateTime
+    ? new Date(fields.startDateTime)
+    : listing.startDateTime;
+  const endDateTime = fields.endDateTime
+    ? new Date(fields.endDateTime)
+    : listing.endDateTime;
   if (endDateTime.getTime() - startDateTime.getTime() < minimumRentalDurationMs) {
     return { reason: "INVALID_DATE_RANGE", listing };
   }
@@ -140,8 +140,8 @@ export async function updateRentalListing(id, ownerId, fields) {
 
   const [updated] = await db
     .update(rentalListings)
-    .set({ ...toDatabaseFields(fields), updated_at: new Date() })
-    .where(and(eq(rentalListings.id, id), eq(rentalListings.owner_id, ownerId)))
+    .set({ ...toDatabaseFields(fields), updatedAt: new Date() })
+    .where(and(eq(rentalListings.id, id), eq(rentalListings.ownerId, ownerId)))
     .returning();
   return { listing: updated };
 }
@@ -157,7 +157,7 @@ export async function deleteRentalListing(id, ownerId) {
 
   const [deleted] = await db
     .delete(rentalListings)
-    .where(and(eq(rentalListings.id, id), eq(rentalListings.owner_id, ownerId)))
+    .where(and(eq(rentalListings.id, id), eq(rentalListings.ownerId, ownerId)))
     .returning({ id: rentalListings.id });
   return { deleted };
 }

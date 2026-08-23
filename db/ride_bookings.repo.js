@@ -1,6 +1,6 @@
 import { eq, and, gte, count, sql } from "drizzle-orm";
 import { db } from "./index.js";
-import { ride_bookings, rides, users, RIDE_STATUS } from "./schema.js";
+import { rideBookings, rides, users, RIDE_STATUS } from "./schema.js";
 
 /**
  * Books seats on a ride. It updates the available seat on the associated ride.
@@ -13,12 +13,12 @@ export async function bookRide(rideId, passengerId, seats) {
   return db.transaction(async (tx) => {
     const [ride] = await tx
       .update(rides)
-      .set({ available_seat_capacity: sql`${rides.available_seat_capacity} - ${seats}` })
+      .set({ availableSeatCapacity: sql`${rides.availableSeatCapacity} - ${seats}` })
       .where(
         and(
           eq(rides.id, rideId),
           eq(rides.status, RIDE_STATUS.PENDING),
-          gte(rides.available_seat_capacity, seats),
+          gte(rides.availableSeatCapacity, seats),
         ),
       )
       .returning();
@@ -26,8 +26,8 @@ export async function bookRide(rideId, passengerId, seats) {
     if (!ride) return null;
 
     const [booking] = await tx
-      .insert(ride_bookings)
-      .values({ ride_id: rideId, passenger_id: passengerId, seats_booked: seats })
+      .insert(rideBookings)
+      .values({ rideId, passengerId, seatsBooked: seats })
       .returning();
 
     return { booking, ride };
@@ -46,15 +46,15 @@ export async function bookRide(rideId, passengerId, seats) {
 export async function cancelBooking(rideId, passengerId) {
   return db.transaction(async (tx) => {
     const [booking] = await tx
-      .delete(ride_bookings)
-      .where(and(eq(ride_bookings.ride_id, rideId), eq(ride_bookings.passenger_id, passengerId)))
+      .delete(rideBookings)
+      .where(and(eq(rideBookings.rideId, rideId), eq(rideBookings.passengerId, passengerId)))
       .returning();
 
     if (!booking) return null;
 
     await tx
       .update(rides)
-      .set({ available_seat_capacity: sql`${rides.available_seat_capacity} + ${booking.seats_booked}` })
+      .set({ availableSeatCapacity: sql`${rides.availableSeatCapacity} + ${booking.seatsBooked}` })
       .where(and(eq(rides.id, rideId), eq(rides.status, RIDE_STATUS.PENDING)));
 
     return booking;
@@ -70,19 +70,19 @@ export async function cancelBooking(rideId, passengerId) {
 export async function getPassengersForRide(rideId) {
   return db
     .select({
-      id: ride_bookings.id,
-      seats_booked: ride_bookings.seats_booked,
-      booked_at: ride_bookings.created_at,
+      id: rideBookings.id,
+      seatsBooked: rideBookings.seatsBooked,
+      bookedAt: rideBookings.createdAt,
       passenger: {
         id: users.id,
-        first_name: users.firstName,
-        last_name: users.lastName,
-        phone_number: users.phoneNumber,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        phoneNumber: users.phoneNumber,
       },
     })
-    .from(ride_bookings)
-    .innerJoin(users, eq(ride_bookings.passenger_id, users.id))
-    .where(eq(ride_bookings.ride_id, rideId));
+    .from(rideBookings)
+    .innerJoin(users, eq(rideBookings.passengerId, users.id))
+    .where(eq(rideBookings.rideId, rideId));
 }
 
 /** 
@@ -100,22 +100,22 @@ export async function updateBooking(rideId, passengerId, newSeatCount) {
     // Get the current booking to find the seat difference
     const [currentBooking] = await tx
       .select()
-      .from(ride_bookings)
-      .where(and(eq(ride_bookings.ride_id, rideId), eq(ride_bookings.passenger_id, passengerId)));
+      .from(rideBookings)
+      .where(and(eq(rideBookings.rideId, rideId), eq(rideBookings.passengerId, passengerId)));
 
     if (!currentBooking) return { success: false, reason: 'NO_BOOKING' };
 
-    const seatDifference = newSeatCount - currentBooking.seats_booked;
+    const seatDifference = newSeatCount - currentBooking.seatsBooked;
 
     // Only proceed if the ride has enough seats and is still pending
     const [updatedRide] = await tx
       .update(rides)
-      .set({ available_seat_capacity: sql`${rides.available_seat_capacity} - ${seatDifference}` })
+      .set({ availableSeatCapacity: sql`${rides.availableSeatCapacity} - ${seatDifference}` })
       .where(
         and(
           eq(rides.id, rideId),
           eq(rides.status, RIDE_STATUS.PENDING),
-          gte(rides.available_seat_capacity, seatDifference),
+          gte(rides.availableSeatCapacity, seatDifference),
         ),
       )
       .returning();
@@ -124,9 +124,9 @@ export async function updateBooking(rideId, passengerId, newSeatCount) {
 
     // Update the booking
     const [updatedBooking] = await tx
-      .update(ride_bookings)
-      .set({ seats_booked: newSeatCount })
-      .where(and(eq(ride_bookings.ride_id, rideId), eq(ride_bookings.passenger_id, passengerId)))
+      .update(rideBookings)
+      .set({ seatsBooked: newSeatCount })
+      .where(and(eq(rideBookings.rideId, rideId), eq(rideBookings.passengerId, passengerId)))
       .returning();
 
     return { success: true, booking: updatedBooking, ride: updatedRide };
@@ -137,13 +137,13 @@ export async function updateBooking(rideId, passengerId, newSeatCount) {
  * Get all the rides a user has booked. newest first.
 */
 export async function getBookingsForPassenger(passengerId, { limit, offset }) {
-  const where = eq(ride_bookings.passenger_id, passengerId);
+  const where = eq(rideBookings.passengerId, passengerId);
   const rows = await db
-    .select({ booking: ride_bookings, ride: rides })
-    .from(ride_bookings)
-    .innerJoin(rides, eq(ride_bookings.ride_id, rides.id))
+    .select({ booking: rideBookings, ride: rides })
+    .from(rideBookings)
+    .innerJoin(rides, eq(rideBookings.rideId, rides.id))
     .where(where)
-    .orderBy(sql`${ride_bookings.created_at} DESC`)
+    .orderBy(sql`${rideBookings.createdAt} DESC`)
     .limit(limit)
     .offset(offset);
   const [{ count: total }] = await db.select({ count: count() }).from(ride_bookings).where(where);

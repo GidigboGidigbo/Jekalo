@@ -16,6 +16,10 @@ import {
   deleteRentalListing,
 } from "../db/rental_listings.repo.js";
 import { createRentalBooking } from "../db/rental_bookings.repo.js";
+import {
+  serializeListing,
+  serializeRentalBooking,
+} from "../utils/serializers.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -39,14 +43,14 @@ router.post(
         error: { code: "INSUFFICIENT_PERMISSIONS", message: "You can only list your own vehicle." },
       });
     }
-    return res.status(201).json(result.listing);
+    return res.status(201).json(serializeListing(result.listing));
   },
 );
 
 // To get all listings a user has put up
 router.get("/listings", async (req, res) => {
   const listings = await getRentalListings(req.user.id);
-  return res.status(200).json(listings);
+  return res.status(200).json(listings.map(serializeListing));
 });
 
 // Allows searching for a car to rent based on start and end date and price
@@ -64,7 +68,7 @@ router.get("/listings/search", async (req, res) => {
   }
 
   const listings = await searchRentalListings(req.user.id, result.data);
-  return res.status(200).json(listings);
+  return res.status(200).json(listings.map(serializeListing));
 });
 
 // Create a booking for a particular rental listing
@@ -88,7 +92,7 @@ router.post(
     if (error) {
       return res.status(error[0]).json({ error: { code: error[1], message: error[2] } });
     }
-    return res.status(201).json(result.booking);
+    return res.status(201).json(serializeRentalBooking(result.booking));
   },
 );
 
@@ -100,7 +104,7 @@ router.get("/listings/:id", async (req, res) => {
       error: { code: "RESOURCE_NOT_FOUND", message: "Rental listing not found." },
     });
   }
-  return res.status(200).json(listing);
+  return res.status(200).json(serializeListing(listing));
 });
 
 // To update a rental listing
@@ -124,7 +128,7 @@ async function updateListing(req, res) {
       },
     });
   }
-  return res.status(200).json(result.listing);
+  return res.status(200).json(serializeListing(result.listing));
 }
 
 router.put(

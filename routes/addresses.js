@@ -39,10 +39,10 @@ router.get("/search", async (req, res) => {
   }
 
   const results = data.results.map(({ formatted_address, geometry, place_id }) => ({
-    display_name: formatted_address,
+    displayName: formatted_address,
     lat: geometry.location.lat,
     lon: geometry.location.lng,
-    place_id,
+    placeId: place_id,
   }));
 
   return res.status(200).json(results);

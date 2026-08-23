@@ -30,19 +30,19 @@ export async function createRentalBooking(renterId, listingId, fields) {
       .for("update");
 
     if (!listing) return { reason: "NOT_FOUND" };
-    if (listing.owner_id === renterId) return { reason: "OWNER_CANNOT_BOOK" };
+    if (listing.ownerId === renterId) return { reason: "OWNER_CANNOT_BOOK" };
     if (![RENTAL_LISTING_STATUS.PENDING, RENTAL_LISTING_STATUS.RETURNED].includes(listing.status)) {
       return { reason: "LISTING_UNAVAILABLE" };
     }
 
-    const startDateTime = new Date(fields.start_date_time);
-    const endDateTime = new Date(fields.end_date_time);
+    const startDateTime = new Date(fields.startDateTime);
+    const endDateTime = new Date(fields.endDateTime);
     const requestedDays = rentalDays(startDateTime, endDateTime);
 
-    if (startDateTime < listing.start_date_time || endDateTime > listing.end_date_time) {
+    if (startDateTime < listing.startDateTime || endDateTime > listing.endDateTime) {
       return { reason: "OUTSIDE_LISTING_WINDOW" };
     }
-    if (requestedDays < Math.max(listing.minimum_days, MIN_RENTAL_DURATION_DAYS)) {
+    if (requestedDays < Math.max(listing.minimumDays, MIN_RENTAL_DURATION_DAYS)) {
       return { reason: "MINIMUM_DURATION" };
     }
 
@@ -52,10 +52,10 @@ export async function createRentalBooking(renterId, listingId, fields) {
       .from(rentalBookings)
       .where(
         and(
-          eq(rentalBookings.listing_id, listingId),
+          eq(rentalBookings.listingId, listingId),
           notInArray(rentalBookings.status, [RENTAL_BOOKING_STATUS.CANCELLED, RENTAL_BOOKING_STATUS.COMPLETED]),
-          lt(rentalBookings.start_date_time, endDateTime),
-          gt(rentalBookings.end_date_time, startDateTime),
+          lt(rentalBookings.startDateTime, endDateTime),
+          gt(rentalBookings.endDateTime, startDateTime),
         ),
       )
       .limit(1);
@@ -64,19 +64,20 @@ export async function createRentalBooking(renterId, listingId, fields) {
     const [booking] = await tx
       .insert(rentalBookings)
       .values({
-        listing_id: listingId,
-        renter_id: renterId,
-        start_date_time: startDateTime,
-        end_date_time: endDateTime,
-        total_amount_ngn: (Number(listing.daily_rate_ngn) * requestedDays).toFixed(2),
-        security_deposit_ngn: listing.security_deposit_ngn,
+        listingId,
+        renterId,
+        startDateTime,
+        endDateTime,
+        // Kobo integers end-to-end: rate x days, no unit conversions.
+        totalAmount: listing.dailyRate * requestedDays,
+        securityDeposit: listing.securityDeposit,
         status: RENTAL_BOOKING_STATUS.CONFIRMED,
       })
       .returning();
 
     const [updatedListing] = await tx
       .update(rentalListings)
-      .set({ status: RENTAL_LISTING_STATUS.RENTED, updated_at: new Date() })
+      .set({ status: RENTAL_LISTING_STATUS.RENTED, updatedAt: new Date() })
       .where(eq(rentalListings.id, listingId))
       .returning();
 

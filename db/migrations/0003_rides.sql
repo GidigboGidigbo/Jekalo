@@ -1,5 +1,5 @@
-CREATE EXTENSION postgis;
---> statement-breakpoint
+CREATE EXTENSION IF NOT EXISTS postgis;--> statement-breakpoint
+CREATE TYPE "public"."ride_status" AS ENUM('PENDING', 'STARTED', 'COMPLETED', 'CANCELLED');--> statement-breakpoint
 
 CREATE TABLE "rides" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

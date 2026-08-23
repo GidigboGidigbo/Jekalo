@@ -4,11 +4,18 @@ import vehicleRoutes from "./routes/vehicles.js";
 import addressRoutes from "./routes/addresses.js";
 import rideRoutes from "./routes/rides.js";
 import rentalRoutes from "./routes/rentals.js";
+import paymentRoutes from "./routes/payments.js";
 import { pool, assertDatabaseConnection } from "./db/index.js";
 
 const app = express();
 
-app.use(express.json());
+// Keeps the untouched body around so the Paystack webhook can verify its
+// HMAC signature against exactly what was sent.
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/v1/users", userRoutes);
@@ -16,6 +23,7 @@ app.use("/api/v1/vehicles", vehicleRoutes);
 app.use("/api/v1/addresses", addressRoutes);
 app.use("/api/v1/rides", rideRoutes);
 app.use("/api/v1/rentals", rentalRoutes);
+app.use("/api/v1/payments", paymentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

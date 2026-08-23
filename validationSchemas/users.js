@@ -1,14 +1,14 @@
 import { z } from "zod";
 
 const MSG = {
-  first_name: "First name must be at least 2 characters.",
-  last_name: "Last name must be at least 2 characters.",
+  firstName: "First name must be at least 2 characters.",
+  lastName: "Last name must be at least 2 characters.",
   email: "A valid email address is required.",
-  phone_required: "Phone number is required.",
-  phone_string: "Phone number must be a string.",
+  phoneRequired: "Phone number is required.",
+  phoneString: "Phone number must be a string.",
   password:
     "Password must be at least 8 characters and contain both letters and numbers.",
-  profile_picture: "Profile picture must be a URL string or null.",
+  profilePicture: "Profile picture must be a URL string or null.",
 };
 
 const nameField = (msg) => z.string({ error: msg }).trim().min(2, msg);
@@ -17,18 +17,18 @@ const emailField = z
   .trim()
   .toLowerCase()
   .pipe(z.email({ error: MSG.email }));
-const profilePictureField = z.url({ error: MSG.profile_picture }).nullish();
+const profilePictureField = z.url({ error: MSG.profilePicture }).nullish();
 
 export const registerSchema = z.object({
-  first_name: nameField(MSG.first_name),
-  last_name: nameField(MSG.last_name),
+  firstName: nameField(MSG.firstName),
+  lastName: nameField(MSG.lastName),
   email: emailField,
-  phone_number: z.string({ error: MSG.phone_required }).min(1, MSG.phone_required),
+  phoneNumber: z.string({ error: MSG.phoneRequired }).min(1, MSG.phoneRequired),
   password: z
     .string({ error: MSG.password })
     .min(8, MSG.password)
     .regex(/^(?=.*[A-Za-z])(?=.*\d)/, MSG.password),
-  profile_picture: profilePictureField,
+  profilePicture: profilePictureField,
 });
 
 export const loginSchema = z.object({
@@ -39,9 +39,9 @@ export const loginSchema = z.object({
 });
 
 export const updateProfileSchema = z.object({
-  first_name: nameField(MSG.first_name).optional(),
-  last_name: nameField(MSG.last_name).optional(),
+  firstName: nameField(MSG.firstName).optional(),
+  lastName: nameField(MSG.lastName).optional(),
   email: emailField.optional(),
-  phone_number: z.string({ error: MSG.phone_string }).optional(),
-  profile_picture: profilePictureField,
+  phoneNumber: z.string({ error: MSG.phoneString }).optional(),
+  profilePicture: profilePictureField,
 });
