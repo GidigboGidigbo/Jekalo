@@ -6,6 +6,8 @@ import rideRoutes from "./routes/rides.js";
 import rentalRoutes from "./routes/rentals.js";
 import paymentRoutes from "./routes/payments.js";
 import { pool, assertDatabaseConnection } from "./db/index.js";
+import { env } from "./utils/env.js";
+import { startHoldSweeper } from "./services/holds.service.js";
 
 const app = express();
 
@@ -46,7 +48,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = env.PORT;
 
 try {
   await assertDatabaseConnection();
@@ -60,8 +62,11 @@ const server = app.listen(PORT, () => {
   console.log(`listening on port: ${PORT}`);
 });
 
+const holdSweeper = startHoldSweeper();
+
 async function shutdown(signal) {
   console.log(`\n${signal} received, shutting down...`);
+  holdSweeper.stop();
   server.close();
   await pool.end();
   process.exit(0);

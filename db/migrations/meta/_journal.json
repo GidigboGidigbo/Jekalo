@@ -85,6 +85,13 @@
       "when": 1787481285607,
       "tag": "0011_rename_money_columns",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787500609633,
+      "tag": "0012_amusing_randall_flagg",
+      "breakpoints": true
     }
   ]
 }

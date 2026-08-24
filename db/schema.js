@@ -68,9 +68,11 @@ export const rentalListings = pgTable("rental_listings", {
 ]);
 
 export const RENTAL_BOOKING_STATUS = {
+  PENDING_PAYMENT: "pending_payment",
   CONFIRMED: "confirmed",
   CANCELLED: "cancelled",
   COMPLETED: "completed",
+  EXPIRED: "expired",
 };
 Object.freeze(RENTAL_BOOKING_STATUS);
 const RENTAL_BOOKING_STATUS_ENUM = pgEnum(
@@ -125,16 +127,40 @@ export const rides = pgTable("rides", {
   completedAt: timestamp("completed_at"),
 }, (rides) => [index("from_location_index").using("gist", rides.fromLocation), index("to_location_index").using("gist", rides.toLocation)]);
 
+// Lifecycle of a booking's hold on seats:
+//   active    → seats reserved, awaiting payment
+//   confirmed → payment settled, seats are theirs
+//   cancelled → rider backed out (seats released)
+//   expired   → sweeper released an unpaid hold (seats restored while pending)
+export const RIDE_BOOKING_STATUS = {
+  ACTIVE: "active",
+  CONFIRMED: "confirmed",
+  CANCELLED: "cancelled",
+  EXPIRED: "expired",
+};
+Object.freeze(RIDE_BOOKING_STATUS);
+const RIDE_BOOKING_STATUS_ENUM = pgEnum(
+  "ride_booking_status",
+  Object.values(RIDE_BOOKING_STATUS),
+);
+
 // A row = one user's booking on a ride (multi-seat supported via seats_booked).
-// The unique index prevents a passenger booking the same ride twice and backs
-// the 409 conflict path in the bookings endpoint.
+// Only one *active* hold per passenger per ride: the partial unique index
+// blocks double-booking while letting riders re-book after cancelling or an
+// expired hold. It backs the 409 conflict path in the bookings endpoint.
 export const rideBookings = pgTable("ride_bookings", {
   id: uuid("id").defaultRandom().primaryKey(),
   rideId: uuid("ride_id").notNull().references(() => rides.id),
   passengerId: uuid("passenger_id").notNull().references(() => users.id),
   seatsBooked: integer("seats_booked").notNull().default(1),
+  status: RIDE_BOOKING_STATUS_ENUM("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, (rideBookings) => [uniqueIndex("ride_booking_unique").on(rideBookings.rideId, rideBookings.passengerId)]);
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (rideBookings) => [
+  uniqueIndex("ride_booking_unique_active")
+    .on(rideBookings.rideId, rideBookings.passengerId)
+    .where(sql`status = 'active'`),
+]);
 
 // Mirrors Paystack transaction statuses we care about. "ongoing"/"queued" are
 // kept as "pending" locally until a terminal status arrives via verify/webhook.

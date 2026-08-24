@@ -38,6 +38,9 @@ export const createBookingSchema = z.object({
     .max(10, "Seats cannot exceed 10 per booking.")
     .optional()
     .default(1),
+  // Where Paystack redirects the rider after checkout. Required so the
+  // frontend fully controls the post-payment landing spot.
+  callbackUrl: z.url("Callback URL must be a valid URL."),
 });
 
 export const updateBookingSchema = z.object({

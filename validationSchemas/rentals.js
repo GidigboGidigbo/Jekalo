@@ -85,6 +85,9 @@ export const createRentalBookingSchema = z
   .object({
     startDateTime: dateTime,
     endDateTime: dateTime,
+    // Where Paystack redirects the renter after checkout. Required so the
+    // frontend fully controls the post-payment landing spot.
+    callbackUrl: z.url("Callback URL must be a valid URL."),
   })
   .refine(
     (fields) => new Date(fields.endDateTime).getTime() > new Date(fields.startDateTime).getTime(),

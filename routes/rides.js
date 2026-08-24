@@ -5,6 +5,8 @@ import { parsePagination, paginatedResponse } from "../utils/pagination.js";
 import { createRideSchema, updateRideStatusSchema, searchRidesSchema, createBookingSchema, updateBookingSchema } from "../validationSchemas/rides.js";
 import { RIDE_STATUS } from "../db/schema.js";
 import { serializeRide } from "../utils/serializers.js";
+import { PaystackError } from "../services/payments.service.js";
+import { bookRideWithPayment } from "../services/rides.service.js";
 import {
   createRide,
   getRide,
@@ -13,7 +15,6 @@ import {
   findMatchingRides,
 } from "../db/rides.repo.js";
 import {
-  bookRide,
   cancelBooking,
   updateBooking,
   getPassengersForRide,
@@ -22,9 +23,10 @@ import {
 
 const router = Router();
 
-/** Postgres unique-constraint violation (duplicate booking). */
+/** Postgres unique-constraint violation (duplicate booking). Drizzle wraps
+ * driver errors, so check the cause chain too. */
 function isUniqueViolation(err) {
-  return err && err.code === "23505";
+  return err && (err.code === "23505" || err.cause?.code === "23505");
 }
 
 router.use(requireAuth);
@@ -77,7 +79,10 @@ router.get("/:id", async (req, res) => {
   return res.status(200).json(serializeRide(ride));
 });
 
-// POST /:id/bookings — create a booking to reserve seats on a pending ride.
+// POST /:id/bookings — book seats and start the rider's Paystack checkout in
+// one step. Seats are reserved as an active hold immediately; unpaid holds are
+// released by the sweeper after HOLD_EXPIRY_MINUTES. Riders who abandon their
+// checkout get a new one by cancelling and booking again (no standalone init).
 router.post(
   "/:id/bookings",
   validate(createBookingSchema, "Invalid booking data."),
@@ -101,21 +106,28 @@ router.post(
     }
 
     try {
-      const result = await bookRide(ride.id, req.user.id, req.body.seats);
-      if (!result) {
+      const result = await bookRideWithPayment({
+        passengerId: req.user.id,
+        email: req.user.email,
+        ride,
+        seats: req.body.seats,
+        callbackUrl: req.body.callbackUrl,
+      });
+      if (result.reason === "NOT_ENOUGH_SEATS") {
         return res.status(422).json({
           error: { code: "BUSINESS_RULE_VIOLATION", message: "Not enough seats available." },
         });
       }
-      return res.status(201).json({
-        booking: result.booking,
-        seatsRemaining: result.ride.availableSeatCapacity,
-        totalPrice: ride.price * req.body.seats,
-      });
+      return res.status(201).json(result);
     } catch (err) {
       if (isUniqueViolation(err)) {
         return res.status(409).json({
-          error: { code: "STATE_CONFLICT", message: "You already have a booking on this ride." },
+          error: { code: "STATE_CONFLICT", message: "You already have an active booking on this ride." },
+        });
+      }
+      if (err instanceof PaystackError) {
+        return res.status(502).json({
+          error: { code: "GATEWAY_ERROR", message: err.message },
         });
       }
       throw err;
