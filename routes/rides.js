@@ -2,11 +2,12 @@ import { Router } from "express";
 import { validate } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { parsePagination, paginatedResponse } from "../utils/pagination.js";
-import { createRideSchema, updateRideStatusSchema, searchRidesSchema, createBookingSchema, updateBookingSchema } from "../validationSchemas/rides.js";
+import { createRideSchema, searchRidesSchema, createBookingSchema, updateBookingSchema } from "../validationSchemas/rides.js";
 import { RIDE_STATUS } from "../db/schema.js";
 import { serializeRide } from "../utils/serializers.js";
-import { PaystackError } from "../services/payments.service.js";
+import { PaystackError } from "../utils/paystack.js";
 import { bookRideWithPayment } from "../services/rides.service.js";
+import { createPayout } from "../services/payments.service.js";
 import {
   createRide,
   getRide,
@@ -20,6 +21,8 @@ import {
   getPassengersForRide,
   getBookingsForPassenger,
 } from "../db/ride_bookings.repo.js";
+import { getSuccessfulPaymentsByRideId } from "../db/payments.repo.js";
+import { getBankAccountByUserId } from "../db/bank_accounts.repo.js";
 
 const router = Router();
 
@@ -222,20 +225,99 @@ router.delete("/:id/bookings/mine", async (req, res) => {
   return res.status(204).end();
 });
 
-router.patch(
-  "/:id/status",
-  validate(updateRideStatusSchema, "Invalid status data."),
-  async (req, res) => {
-    const updated = await updateRideStatus(req.params.id, req.user.id, req.body.status);
+// PATCH /:id/start — driver starts the ride. PENDING → STARTED.
+router.patch("/:id/start", async (req, res) => {
+  const ride = await getRide(req.params.id);
 
-    if (!updated) {
-      return res.status(404).json({
-        error: { code: "RESOURCE_NOT_FOUND", message: "Ride not found." },
-      });
+  if (!ride) {
+    return res.status(404).json({
+      error: { code: "RESOURCE_NOT_FOUND", message: "Ride not found." },
+    });
+  }
+  if (ride.driverId !== req.user.id) {
+    return res.status(403).json({
+      error: { code: "INSUFFICIENT_PERMISSIONS", message: "Only the driver can start this ride." },
+    });
+  }
+  if (ride.status !== RIDE_STATUS.PENDING) {
+    return res.status(422).json({
+      error: { code: "BUSINESS_RULE_VIOLATION", message: "Ride can only be started from pending status." },
+    });
+  }
+
+  const updated = await updateRideStatus(req.params.id, req.user.id, RIDE_STATUS.STARTED);
+  return res.status(200).json(serializeRide(updated));
+});
+
+// PATCH /:id/complete — driver completes the ride and triggers driver settlement.
+// STARTED → COMPLETED. For each confirmed booking with a successful payment,
+// initiates a Paystack transfer to the driver's bank account.
+router.patch("/:id/complete", async (req, res) => {
+  const ride = await getRide(req.params.id);
+
+  if (!ride) {
+    return res.status(404).json({
+      error: { code: "RESOURCE_NOT_FOUND", message: "Ride not found." },
+    });
+  }
+  if (ride.driverId !== req.user.id) {
+    return res.status(403).json({
+      error: { code: "INSUFFICIENT_PERMISSIONS", message: "Only the driver can complete this ride." },
+    });
+  }
+  if (ride.status !== RIDE_STATUS.STARTED) {
+    return res.status(422).json({
+      error: { code: "BUSINESS_RULE_VIOLATION", message: "Ride can only be completed from started status." },
+    });
+  }
+
+  const updated = await updateRideStatus(req.params.id, req.user.id, RIDE_STATUS.COMPLETED);
+
+  // Settle the driver: pay out each successful booking's payment.
+  const payments = await getSuccessfulPaymentsByRideId(ride.id);
+  const bankAccount = await getBankAccountByUserId(ride.driverId);
+
+  const payouts = [];
+  if (bankAccount?.paystackRecipientCode) {
+    for (const { payments: payment } of payments) {
+      try {
+        const result = await createPayout({
+          paymentId: payment.id,
+          recipientCode: bankAccount.paystackRecipientCode,
+        });
+        if (result.reason) continue;
+        payouts.push({ paymentId: payment.id, payoutAmount: result.payoutAmount });
+      } catch {
+        // Individual payout failures are logged but don't fail the ride completion.
+      }
     }
+  }
 
-    return res.status(200).json(serializeRide(updated));
-  },
-);
+  return res.status(200).json({ ride: serializeRide(updated), payouts });
+});
+
+// PATCH /:id/cancel — driver cancels the ride. PENDING or STARTED → CANCELLED.
+router.patch("/:id/cancel", async (req, res) => {
+  const ride = await getRide(req.params.id);
+
+  if (!ride) {
+    return res.status(404).json({
+      error: { code: "RESOURCE_NOT_FOUND", message: "Ride not found." },
+    });
+  }
+  if (ride.driverId !== req.user.id) {
+    return res.status(403).json({
+      error: { code: "INSUFFICIENT_PERMISSIONS", message: "Only the driver can cancel this ride." },
+    });
+  }
+  if (ride.status !== RIDE_STATUS.PENDING && ride.status !== RIDE_STATUS.STARTED) {
+    return res.status(422).json({
+      error: { code: "BUSINESS_RULE_VIOLATION", message: "Ride cannot be cancelled from current status." },
+    });
+  }
+
+  const updated = await updateRideStatus(req.params.id, req.user.id, RIDE_STATUS.CANCELLED);
+  return res.status(200).json(serializeRide(updated));
+});
 
 export default router;

@@ -15,7 +15,7 @@ import {
   updateRentalListing,
   deleteRentalListing,
 } from "../db/rental_listings.repo.js";
-import { PaystackError } from "../services/payments.service.js";
+import { PaystackError } from "../utils/paystack.js";
 import { bookListingWithPayment } from "../services/rentals.service.js";
 import { serializeListing } from "../utils/serializers.js";
 

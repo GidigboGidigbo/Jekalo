@@ -2,6 +2,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "./index.js";
 import {
   payments,
+  rideBookings,
   ledgerEntries,
   PAYMENT_STATUS,
   LEDGER_ENTRY_TYPE,
@@ -149,4 +150,17 @@ export async function getHeldAmountForPayment(paymentId) {
     .from(ledgerEntries)
     .where(eq(ledgerEntries.paymentId, paymentId));
   return Number(row?.held ?? 0);
+}
+
+export async function getSuccessfulPaymentsByRideId(rideId) {
+  return db
+    .select()
+    .from(payments)
+    .innerJoin(rideBookings, eq(payments.rideBookingId, rideBookings.id))
+    .where(
+      and(
+        eq(rideBookings.rideId, rideId),
+        eq(payments.status, PAYMENT_STATUS.SUCCESS),
+      ),
+    );
 }

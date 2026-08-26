@@ -258,6 +258,22 @@ const LEDGER_ENTRY_STATUS_ENUM = pgEnum(
   Object.values(LEDGER_ENTRY_STATUS),
 );
 
+export const banks = pgTable("banks", {
+  code: text("code").primaryKey(),
+  name: text("name").notNull(),
+});
+
+export const bankAccounts = pgTable("bank_accounts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id).unique(),
+  accountNumber: text("account_number").notNull(),
+  bankCode: text("bank_code").notNull().references(() => banks.code),
+  accountName: text("account_name"),
+  paystackRecipientCode: text("paystack_recipient_code").unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const ledgerEntries = pgTable("ledger_entries", {
   id: uuid("id").defaultRandom().primaryKey(),
   paymentId: uuid("payment_id").notNull().references(() => payments.id),

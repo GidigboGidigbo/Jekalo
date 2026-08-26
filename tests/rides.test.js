@@ -171,15 +171,14 @@ describe("Rides", () => {
     });
   });
 
-  describe("PATCH /:id/status", () => {
-    it("updates ride status to STARTED", async () => {
-      const res = await fetch(`${baseUrl}/api/v1/rides/${rideId}/status`, {
+  describe("PATCH /:id/start", () => {
+    it("starts the ride", async () => {
+      const res = await fetch(`${baseUrl}/api/v1/rides/${rideId}/start`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${driverToken}`,
         },
-        body: JSON.stringify({ status: "STARTED" }),
       });
 
       const body = await res.json();
@@ -187,17 +186,16 @@ describe("Rides", () => {
       assert.strictEqual(body.status, "STARTED");
     });
 
-    it("returns 400 for invalid status", async () => {
-      const res = await fetch(`${baseUrl}/api/v1/rides/${rideId}/status`, {
+    it("returns 422 if ride is not pending", async () => {
+      const res = await fetch(`${baseUrl}/api/v1/rides/${rideId}/start`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${driverToken}`,
         },
-        body: JSON.stringify({ status: "INVALID" }),
       });
 
-      assert.strictEqual(res.status, 400);
+      assert.strictEqual(res.status, 422);
     });
   });
 
@@ -317,13 +315,12 @@ describe("Rides", () => {
         pickupDate: "2026-08-23",
       });
 
-      await fetch(`${baseUrl}/api/v1/rides/${started.id}/status`, {
+      await fetch(`${baseUrl}/api/v1/rides/${started.id}/start`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${driverToken}`,
         },
-        body: JSON.stringify({ status: "STARTED" }),
       });
 
       const results = await findMatchingRides(

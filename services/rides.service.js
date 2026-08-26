@@ -2,7 +2,8 @@ import { PAYMENT_PURPOSE } from "../db/schema.js";
 import { PLATFORM_FEE_BPS } from "../utils/money.js";
 import { serializePayment } from "../utils/serializers.js";
 import { bookRide, cancelBooking } from "../db/ride_bookings.repo.js";
-import { PaystackError, initializePayment } from "./payments.service.js";
+import { PaystackError } from "../utils/paystack.js";
+import { initializePayment } from "./payments.service.js";
 
 export async function bookRideWithPayment({ passengerId, email, ride, seats, callbackUrl }) {
   const booked = await bookRide(ride.id, passengerId, seats);

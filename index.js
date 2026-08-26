@@ -8,6 +8,8 @@ import paymentRoutes from "./routes/payments.js";
 import { pool, assertDatabaseConnection } from "./db/index.js";
 import { env } from "./utils/env.js";
 import { startHoldSweeper } from "./services/holds.service.js";
+import { syncBanksFromPaystack } from "./services/banks.service.js";
+import bankAccountRoutes from "./routes/bank_accounts.js";
 
 const app = express();
 
@@ -26,6 +28,7 @@ app.use("/api/v1/addresses", addressRoutes);
 app.use("/api/v1/rides", rideRoutes);
 app.use("/api/v1/rentals", rentalRoutes);
 app.use("/api/v1/payments", paymentRoutes);
+app.use("/api/v1/bank-accounts", bankAccountRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -56,6 +59,13 @@ try {
   console.error("Could not connect to the database. Is Postgres running? (docker compose up -d)");
   console.error(err.message);
   process.exit(1);
+}
+
+try {
+  const count = await syncBanksFromPaystack();
+  console.log(`Synced ${count} banks from Paystack.`);
+} catch (err) {
+  console.warn("Could not sync banks from Paystack:", err.message);
 }
 
 const server = app.listen(PORT, () => {

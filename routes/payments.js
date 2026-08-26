@@ -2,8 +2,8 @@ import { Router } from "express";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { listPaymentsForUser } from "../db/payments.repo.js";
 import { serializePayment } from "../utils/serializers.js";
+import { PaystackError } from "../utils/paystack.js";
 import {
-  PaystackError,
   processWebhookEvent,
   verifyPayment,
   verifyWebhookSignature,

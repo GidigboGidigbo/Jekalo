@@ -10,6 +10,7 @@ import rideRoutes from "../routes/rides.js";
 import addressRoutes from "../routes/addresses.js";
 import rentalRoutes from "../routes/rentals.js";
 import paymentRoutes from "../routes/payments.js";
+import bankAccountRoutes from "../routes/bank_accounts.js";
 
 const JWT_SECRET = process.env.JWT_SECRET || "jekalo-dev-secret";
 
@@ -28,6 +29,7 @@ export function buildApp() {
   app.use("/api/v1/addresses", addressRoutes);
   app.use("/api/v1/rentals", rentalRoutes);
   app.use("/api/v1/payments", paymentRoutes);
+  app.use("/api/v1/bank-accounts", bankAccountRoutes);
 
   // Mirrors index.js so unmatched routes return the standard JSON envelope.
   app.use((req, res) => {
@@ -84,6 +86,7 @@ export async function cleanupTestData() {
   await pool.query("DELETE FROM rental_listings").catch(() => {});
   await pool.query("DELETE FROM rides").catch(() => {});
   await pool.query("DELETE FROM vehicles").catch(() => {});
+  await pool.query("DELETE FROM bank_accounts").catch(() => {});
   await pool.query("DELETE FROM users").catch(() => {});
 }
 
