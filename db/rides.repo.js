@@ -37,6 +37,23 @@ export async function updateRideStatus(id, driverId, status) {
   return row;
 }
 
+/**
+ * Atomically sets ride completion timestamps.
+ * Called when driver completes the ride.
+ * Returns the updated ride row.
+ */
+export async function updateRideTimestamps(id, { startedAt, completedAt }) {
+  const [row] = await db
+    .update(rides)
+    .set({
+      ...(startedAt ? { startedAt } : {}),
+      ...(completedAt ? { completedAt } : {}),
+    })
+    .where(eq(rides.id, id))
+    .returning();
+  return row;
+}
+
 export async function findMatchingRides(originLat, originLng, destLat, destLng, radiusKm = 3) {
   const radiusMeters = radiusKm * 1000;
   const originPoint = sql`ST_SetSRID(ST_MakePoint(${originLng}, ${originLat}), 4326)::geography`;

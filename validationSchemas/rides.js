@@ -50,3 +50,18 @@ export const updateBookingSchema = z.object({
     .min(1, "Seats must be at least 1 — to remove your booking, cancel it instead.")
     .max(10, "Seats cannot exceed 10 per booking."),
 });
+
+export const confirmCompletionSchema = z.object({
+  rating: z
+    .number({ error: "Rating must be a number." })
+    .int("Rating must be a whole number.")
+    .min(1, "Rating must be at least 1 star.")
+    .max(5, "Rating cannot exceed 5 stars.")
+    .optional(),
+  issueReport: z
+    .string({ error: "Issue report must be a string." })
+    .min(1, "Issue report must not be empty.")
+    .max(500, "Issue report cannot exceed 500 characters.")
+    .optional()
+    .nullable(),
+});

@@ -292,3 +292,20 @@ export const ledgerEntries = pgTable("ledger_entries", {
 }, (ledgerEntries) => [
   index("ledger_entry_payment_index").on(ledgerEntries.paymentId),
 ]);
+
+// This table is an immutable record that stores passengers marking their ride as
+// complete. It includes an optional rating for that particular trip, as well as
+// any other issues that the passenger wants to report regarding the trip.
+export const rideCompletionConfirmations = pgTable("ride_completion_confirmations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  rideId: uuid("ride_id").notNull().references(() => rides.id),
+  passengerId: uuid("passenger_id").notNull().references(() => users.id),
+  rating: integer("rating").check(sql`rating >= 1 AND rating <= 5`),
+  issueReport: text("issue_report"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, (confirmations) => [
+  uniqueIndex("ride_confirmation_unique")
+    .on(confirmations.rideId, confirmations.passengerId),
+  index("ride_confirmation_ride_index").on(confirmations.rideId),
+  index("ride_confirmation_passenger_index").on(confirmations.passengerId),
+]);

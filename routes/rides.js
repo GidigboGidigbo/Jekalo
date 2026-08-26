@@ -2,11 +2,11 @@ import { Router } from "express";
 import { validate } from "../middleware/validate.js";
 import { requireAuth } from "../middleware/requireAuth.js";
 import { parsePagination, paginatedResponse } from "../utils/pagination.js";
-import { createRideSchema, searchRidesSchema, createBookingSchema, updateBookingSchema } from "../validationSchemas/rides.js";
+import { createRideSchema, searchRidesSchema, createBookingSchema, updateBookingSchema, confirmCompletionSchema } from "../validationSchemas/rides.js";
 import { RIDE_STATUS } from "../db/schema.js";
 import { serializeRide } from "../utils/serializers.js";
 import { PaystackError } from "../utils/paystack.js";
-import { bookRideWithPayment } from "../services/rides.service.js";
+import { bookRideWithPayment, completeRideWithPayouts } from "../services/rides.service.js";
 import { createPayout } from "../services/payments.service.js";
 import {
   createRide,
@@ -21,6 +21,10 @@ import {
   getPassengersForRide,
   getBookingsForPassenger,
 } from "../db/ride_bookings.repo.js";
+import {
+  insertCompletionConfirmation,
+  getCompletionConfirmationsForRide,
+} from "../db/ride_confirmations.repo.js";
 import { getSuccessfulPaymentsByRideId } from "../db/payments.repo.js";
 import { getBankAccountByUserId } from "../db/bank_accounts.repo.js";
 
@@ -250,50 +254,77 @@ router.patch("/:id/start", async (req, res) => {
 });
 
 // PATCH /:id/complete — driver completes the ride and triggers driver settlement.
-// STARTED → COMPLETED. For each confirmed booking with a successful payment,
-// initiates a Paystack transfer to the driver's bank account.
+// STARTED → COMPLETED. Orchestrates passenger confirmations with grace period,
+// validates bank account, and initiates Paystack transfers for each successful payment.
+// Returns detailed payout status for each payment + confirmation summary.
 router.patch("/:id/complete", async (req, res) => {
-  const ride = await getRide(req.params.id);
+  const result = await completeRideWithPayouts(req.params.id, req.user.id);
 
-  if (!ride) {
-    return res.status(404).json({
-      error: { code: "RESOURCE_NOT_FOUND", message: "Ride not found." },
-    });
-  }
-  if (ride.driverId !== req.user.id) {
-    return res.status(403).json({
-      error: { code: "INSUFFICIENT_PERMISSIONS", message: "Only the driver can complete this ride." },
-    });
-  }
-  if (ride.status !== RIDE_STATUS.STARTED) {
-    return res.status(422).json({
-      error: { code: "BUSINESS_RULE_VIOLATION", message: "Ride can only be completed from started status." },
-    });
-  }
-
-  const updated = await updateRideStatus(req.params.id, req.user.id, RIDE_STATUS.COMPLETED);
-
-  // Settle the driver: pay out each successful booking's payment.
-  const payments = await getSuccessfulPaymentsByRideId(ride.id);
-  const bankAccount = await getBankAccountByUserId(ride.driverId);
-
-  const payouts = [];
-  if (bankAccount?.paystackRecipientCode) {
-    for (const { payments: payment } of payments) {
-      try {
-        const result = await createPayout({
-          paymentId: payment.id,
-          recipientCode: bankAccount.paystackRecipientCode,
+  if (!result.success) {
+    // Map service error reasons to HTTP responses
+    switch (result.reason) {
+      case "RIDE_NOT_FOUND":
+        return res.status(404).json({
+          error: { code: "RESOURCE_NOT_FOUND", message: "Ride not found." },
         });
-        if (result.reason) continue;
-        payouts.push({ paymentId: payment.id, payoutAmount: result.payoutAmount });
-      } catch {
-        // Individual payout failures are logged but don't fail the ride completion.
-      }
+      
+      case "INSUFFICIENT_PERMISSIONS":
+        return res.status(403).json({
+          error: { code: "INSUFFICIENT_PERMISSIONS", message: "Only the driver can complete this ride." },
+        });
+      
+      case "INVALID_RIDE_STATUS":
+        return res.status(422).json({
+          error: {
+            code: "BUSINESS_RULE_VIOLATION",
+            message: "Ride can only be completed from started status.",
+            details: { current: result.details?.current },
+          },
+        });
+      
+      case "NO_BANK_ACCOUNT":
+        return res.status(422).json({
+          error: {
+            code: "BUSINESS_RULE_VIOLATION",
+            message: "Please add a bank account to receive your earnings.",
+          },
+        });
+      
+      case "AWAITING_PASSENGER_CONFIRMATIONS":
+        return res.status(422).json({
+          error: {
+            code: "BUSINESS_RULE_VIOLATION",
+            message: "Waiting for passengers to confirm ride completion.",
+            details: result.details,
+          },
+        });
+      
+      case "PASSENGER_DISPUTES":
+        return res.status(409).json({
+          error: {
+            code: "STATE_CONFLICT",
+            message: "Ride has unresolved disputes from passengers.",
+            details: result.details,
+          },
+        });
+      
+      case "COMPLETION_ERROR":
+      default:
+        return res.status(500).json({
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "Failed to complete ride.",
+            details: result.details,
+          },
+        });
     }
   }
 
-  return res.status(200).json({ ride: serializeRide(updated), payouts });
+  return res.status(200).json({
+    ride: serializeRide(result.ride),
+    payouts: result.payouts,
+    confirmations: result.confirmations,
+  });
 });
 
 // PATCH /:id/cancel — driver cancels the ride. PENDING or STARTED → CANCELLED.
@@ -319,5 +350,64 @@ router.patch("/:id/cancel", async (req, res) => {
   const updated = await updateRideStatus(req.params.id, req.user.id, RIDE_STATUS.CANCELLED);
   return res.status(200).json(serializeRide(updated));
 });
+
+// POST /:id/confirm-completion — passenger confirms the ride is complete (i.e. they
+// have arrived at their stop)
+// Creates an immutable confirmation record with optional rating and issue report.
+// Used to track completion before driver can settle and to flag issues.
+router.post(
+  "/:id/confirm-completion",
+  validate(confirmCompletionSchema, "Invalid confirmation data."),
+  async (req, res) => {
+    const ride = await getRide(req.params.id);
+
+    if (!ride) {
+      return res.status(404).json({
+        error: { code: "RESOURCE_NOT_FOUND", message: "Ride not found." },
+      });
+    }
+
+    // Only passengers on a ride can confirm the ride as complete
+    const passengers = await getPassengersForRide(req.params.id);
+    const passenger = passengers.find(p => p.passengerId === req.user.id);
+    if (!passenger) {
+      return res.status(403).json({
+        error: { code: "INSUFFICIENT_PERMISSIONS", message: "Only passengers on this ride can confirm completion." },
+      });
+    }
+
+    // Confirmation only makes sense after ride has started
+    if (ride.status !== RIDE_STATUS.STARTED) {
+      return res.status(422).json({
+        error: { code: "BUSINESS_RULE_VIOLATION", message: "Ride must be started before completion can be confirmed." },
+      });
+    }
+
+    // Insert confirmation from passenger that a ride is complete
+    const confirmation = await insertCompletionConfirmation({
+      rideId: req.params.id,
+      passengerId: req.user.id,
+      rating: req.body.rating ?? null,
+      issueReport: req.body.issueReport ?? null,
+    });
+
+    if (!confirmation) {
+      return res.status(409).json({
+        error: { code: "STATE_CONFLICT", message: "You have already confirmed completion for this ride." },
+      });
+    }
+
+    return res.status(201).json({
+      confirmation: {
+        id: confirmation.id,
+        rideId: confirmation.rideId,
+        passengerId: confirmation.passengerId,
+        rating: confirmation.rating,
+        issueReport: confirmation.issueReport,
+        confirmedAt: confirmation.createdAt,
+      },
+    });
+  },
+);
 
 export default router;
