@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import styled from 'styled-components'
+import AuthDetailsCard from '@/components/AuthDetailsCard'
 
 type FormState = {
   firstName: string
@@ -55,7 +56,7 @@ function Page() {
   }
 
   return (
-    <Wrapper>
+    <AuthDetailsCard>
       <Form onSubmit={handleSubmit} noValidate>
         <h1>Create your account</h1>
         <p>Basic verification is required for every account. You&apos;ll complete extra checks later if you want to offer rides, rent out a car, or list one for lease.</p>
@@ -144,22 +145,15 @@ function Page() {
           Already have an account? <Link href="/login">Log in</Link>
         </FormFooter>
       </Form>
-    </Wrapper>
+    </AuthDetailsCard>
   )
 }
-
-const Wrapper = styled.div`
-  display: flex;
-  justify-content: center;
-  padding: 48px 16px;
-`
 
 const Form = styled.form`
   display: flex;
   flex-direction: column;
   gap: 16px;
   width: 100%;
-  max-width: 420px;
 
   h1 {
     color: brown;

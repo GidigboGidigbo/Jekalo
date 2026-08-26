@@ -14,9 +14,12 @@ function SideBar() {
         {isOpen ? <X size={28} strokeWidth={2} /> : <Menu size={28} strokeWidth={2} />}
       </ToggleSidebar>
       <Panel $isOpen={isOpen}>
+        <button><Link href={"/book-ride"}>Book a ride</Link></button>
         <button><Link href={"/my-rides"}>View your rides</Link></button>
+        <button><Link href={"/vehicles"}>My vehicles</Link></button>
         <button><Link href={"/offer-ride"}>Offer rides</Link></button>
-        <button><Link href={"/rent-car"}>View your rentals</Link></button>
+        <button><Link href={"/my-rentals"}>View your rentals</Link></button>
+        <button><Link href={"/rent-car"}>Rent a car</Link></button>
         <button><Link href={"/list-for-rent"}>List a car for rental</Link></button>
         <button>Log out</button>
       </Panel>
