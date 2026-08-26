@@ -8,7 +8,7 @@
     "dev": "node --watch index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test --test-concurrency=1 tests/*.test.js"
   },
   "keywords": [],
   "author": "",
@@ -16,10 +16,12 @@
   "type": "module",
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "cron-time-generator": "^2.0.3",
     "dotenv": "^17.4.2",
     "drizzle-orm": "^0.45.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
+    "node-cron": "^4.6.0",
     "pg": "^8.23.0",
     "styled-components": "^6.5.3",
     "zod": "^4.4.3"

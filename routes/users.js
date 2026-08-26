@@ -21,7 +21,7 @@ const TOKEN_EXPIRES_IN_SECONDS = 3600; // 1 hour
 
 /** Strip sensitive fields before returning a user record to the client. */
 function toPublicUser(user) {
-  const { password_hash, ...publicUser } = user;
+  const { passwordHash, ...publicUser } = user;
   return publicUser;
 }
 
@@ -43,7 +43,7 @@ router.post(
   "/register",
   validate(registerSchema, "Invalid registration data."),
   async (req, res) => {
-    const { first_name, last_name, email, phone_number, password, profile_picture } =
+    const { firstName, lastName, email, phoneNumber, password, profilePicture } =
       req.body;
 
     if (await findUserByEmail(email)) {
@@ -54,12 +54,12 @@ router.post(
 
     try {
       const user = await createUser({
-        first_name,
-        last_name,
+        firstName,
+        lastName,
         email,
-        phone_number,
-        password_hash: await bcrypt.hash(password, 10),
-        profile_picture,
+        phoneNumber,
+        passwordHash: await bcrypt.hash(password, 10),
+        profilePicture,
       });
       res.status(201).json({ user: toPublicUser(user) });
     } catch (err) {
@@ -78,7 +78,7 @@ router.post("/login", validate(loginSchema, "Invalid login data."), async (req, 
   const { identifier, password } = req.body;
 
   const user = (await findUserByEmail(identifier)) ?? (await findUserByPhone(identifier));
-  const credentialsValid = user && (await bcrypt.compare(password, user.password_hash));
+  const credentialsValid = user && (await bcrypt.compare(password, user.passwordHash));
   if (!credentialsValid) {
     return res.status(401).json({
       error: { code: "UNAUTHENTICATED", message: "Invalid credentials." },
@@ -86,9 +86,9 @@ router.post("/login", validate(loginSchema, "Invalid login data."), async (req, 
   }
 
   res.json({
-    access_token: signToken(user),
-    token_type: "Bearer",
-    expires_in: TOKEN_EXPIRES_IN_SECONDS,
+    accessToken: signToken(user),
+    tokenType: "Bearer",
+    expiresIn: TOKEN_EXPIRES_IN_SECONDS,
     user: toPublicUser(user),
   });
 });
@@ -104,7 +104,7 @@ router.put(
   requireAuth,
   validate(updateProfileSchema, "Invalid profile data."),
   async (req, res) => {
-    const { first_name, last_name, email, phone_number, profile_picture } = req.body;
+    const { firstName, lastName, email, phoneNumber, profilePicture } = req.body;
 
     if (email !== undefined) {
       const existing = await findUserByEmail(email);
@@ -117,11 +117,11 @@ router.put(
 
     try {
       const updated = await updateUser(req.user.id, {
-        first_name,
-        last_name,
+        firstName,
+        lastName,
         email,
-        phone_number,
-        profile_picture,
+        phoneNumber,
+        profilePicture,
       });
       res.json({ user: toPublicUser(updated) });
     } catch (err) {

@@ -15,7 +15,9 @@ import {
   updateRentalListing,
   deleteRentalListing,
 } from "../db/rental_listings.repo.js";
-import { createRentalBooking } from "../db/rental_bookings.repo.js";
+import { PaystackError } from "../utils/paystack.js";
+import { bookListingWithPayment } from "../services/rentals.service.js";
+import { serializeListing } from "../utils/serializers.js";
 
 const router = Router();
 router.use(requireAuth);
@@ -39,14 +41,14 @@ router.post(
         error: { code: "INSUFFICIENT_PERMISSIONS", message: "You can only list your own vehicle." },
       });
     }
-    return res.status(201).json(result.listing);
+    return res.status(201).json(serializeListing(result.listing));
   },
 );
 
 // To get all listings a user has put up
 router.get("/listings", async (req, res) => {
   const listings = await getRentalListings(req.user.id);
-  return res.status(200).json(listings);
+  return res.status(200).json(listings.map(serializeListing));
 });
 
 // Allows searching for a car to rent based on start and end date and price
@@ -64,31 +66,47 @@ router.get("/listings/search", async (req, res) => {
   }
 
   const listings = await searchRentalListings(req.user.id, result.data);
-  return res.status(200).json(listings);
+  return res.status(200).json(listings.map(serializeListing));
 });
 
-// Create a booking for a particular rental listing
-// TODO: Get bookings (for a rental, for a user)
-// Update a user's booking for a listing
-// Delete a user's booking for a listing
+// POST /listings/:id/bookings — book dates and start the renter's Paystack
+// checkout in one step. The hold is `pending_payment`; the listing only flips
+// to RENTED once the charge settles. Unpaid holds are expired by the sweeper
+// after HOLD_EXPIRY_MINUTES, which frees the dates for re-booking.
 router.post(
   "/listings/:id/bookings",
   validate(createRentalBookingSchema, "Invalid rental booking data."),
   async (req, res) => {
-    const result = await createRentalBooking(req.user.id, req.params.id, req.body);
-    const errors = {
-      NOT_FOUND: [404, "RESOURCE_NOT_FOUND", "Rental listing not found."],
-      OWNER_CANNOT_BOOK: [422, "BUSINESS_RULE_VIOLATION", "You cannot book your own rental listing."],
-      LISTING_UNAVAILABLE: [422, "BUSINESS_RULE_VIOLATION", "This rental listing is not available."],
-      OUTSIDE_LISTING_WINDOW: [422, "BUSINESS_RULE_VIOLATION", "The requested dates are outside the listing availability window."],
-      MINIMUM_DURATION: [422, "BUSINESS_RULE_VIOLATION", "The requested rental does not meet the minimum duration."],
-      DATE_CONFLICT: [409, "STATE_CONFLICT", "The rental listing is already booked for part of those dates."],
-    };
-    const error = errors[result.reason];
-    if (error) {
-      return res.status(error[0]).json({ error: { code: error[1], message: error[2] } });
+    try {
+      const result = await bookListingWithPayment({
+        renterId: req.user.id,
+        email: req.user.email,
+        listingId: req.params.id,
+        fields: req.body,
+        callbackUrl: req.body.callbackUrl,
+      });
+
+      const errors = {
+        NOT_FOUND: [404, "RESOURCE_NOT_FOUND", "Rental listing not found."],
+        OWNER_CANNOT_BOOK: [422, "BUSINESS_RULE_VIOLATION", "You cannot book your own rental listing."],
+        LISTING_UNAVAILABLE: [422, "BUSINESS_RULE_VIOLATION", "This rental listing is not available."],
+        OUTSIDE_LISTING_WINDOW: [422, "BUSINESS_RULE_VIOLATION", "The requested dates are outside the listing availability window."],
+        MINIMUM_DURATION: [422, "BUSINESS_RULE_VIOLATION", "The requested rental does not meet the minimum duration."],
+        DATE_CONFLICT: [409, "STATE_CONFLICT", "The rental listing is already booked for part of those dates."],
+      };
+      const error = errors[result.reason];
+      if (error) {
+        return res.status(error[0]).json({ error: { code: error[1], message: error[2] } });
+      }
+      return res.status(201).json(result);
+    } catch (err) {
+      if (err instanceof PaystackError) {
+        return res.status(502).json({
+          error: { code: "GATEWAY_ERROR", message: err.message },
+        });
+      }
+      throw err;
     }
-    return res.status(201).json(result.booking);
   },
 );
 
@@ -100,7 +118,7 @@ router.get("/listings/:id", async (req, res) => {
       error: { code: "RESOURCE_NOT_FOUND", message: "Rental listing not found." },
     });
   }
-  return res.status(200).json(listing);
+  return res.status(200).json(serializeListing(listing));
 });
 
 // To update a rental listing
@@ -124,7 +142,7 @@ async function updateListing(req, res) {
       },
     });
   }
-  return res.status(200).json(result.listing);
+  return res.status(200).json(serializeListing(result.listing));
 }
 
 router.put(

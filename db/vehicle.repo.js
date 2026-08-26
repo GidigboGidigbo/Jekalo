@@ -2,25 +2,25 @@ import { eq, and } from "drizzle-orm";
 import { db } from "./index.js";
 import { vehicle } from "./schema.js";
 
-export async function registerVehicle(fields, driver_id) {
-  const [row] = await db.insert(vehicle).values({ ...fields, driver_id }).returning();
+export async function registerVehicle(fields, driverId) {
+  const [row] = await db.insert(vehicle).values({ ...fields, driverId }).returning();
   return row;
 }
 
-export async function updateVehicleDetails(id, driver_id, fields) {
+export async function updateVehicleDetails(id, driverId, fields) {
   const [row] = await db
     .update(vehicle)
     .set(fields)
-    .where(and(eq(vehicle.id, id), eq(vehicle.driver_id, driver_id)))
+    .where(and(eq(vehicle.id, id), eq(vehicle.driverId, driverId)))
     .returning();
   return row;
 }
 
-export async function getDriverVehicles(driver_id) {
+export async function getDriverVehicles(driverId) {
     const rows = await db
       .select()
       .from(vehicle)
-      .where(eq(vehicle.driver_id, driver_id));
+      .where(eq(vehicle.driverId, driverId));
     return rows;
 }
 
@@ -29,19 +29,19 @@ export async function getVehicle(id) {
     return row;
 }
 
-export async function getOwnedVehicle(id, driver_id) {
+export async function getOwnedVehicle(id, driverId) {
   const [row] = await db
     .select()
     .from(vehicle)
-    .where(and(eq(vehicle.id, id), eq(vehicle.driver_id, driver_id)))
+    .where(and(eq(vehicle.id, id), eq(vehicle.driverId, driverId)))
     .limit(1);
   return row;
 }
 
-export async function deleteVehicle(id, driver_id) {
+export async function deleteVehicle(id, driverId) {
   const [row] = await db
     .delete(vehicle)
-    .where(and(eq(vehicle.id, id), eq(vehicle.driver_id, driver_id)))
+    .where(and(eq(vehicle.id, id), eq(vehicle.driverId, driverId)))
     .returning({ id: vehicle.id });
   return row;
 }

@@ -4,11 +4,22 @@ import vehicleRoutes from "./routes/vehicles.js";
 import addressRoutes from "./routes/addresses.js";
 import rideRoutes from "./routes/rides.js";
 import rentalRoutes from "./routes/rentals.js";
+import paymentRoutes from "./routes/payments.js";
 import { pool, assertDatabaseConnection } from "./db/index.js";
+import { env } from "./utils/env.js";
+import { startHoldSweeper } from "./services/holds.service.js";
+import { syncBanksFromPaystack } from "./services/banks.service.js";
+import bankAccountRoutes from "./routes/bank_accounts.js";
 
 const app = express();
 
-app.use(express.json());
+// Keeps the untouched body around so the Paystack webhook can verify its
+// HMAC signature against exactly what was sent.
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf;
+  },
+}));
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/v1/users", userRoutes);
@@ -16,6 +27,8 @@ app.use("/api/v1/vehicles", vehicleRoutes);
 app.use("/api/v1/addresses", addressRoutes);
 app.use("/api/v1/rides", rideRoutes);
 app.use("/api/v1/rentals", rentalRoutes);
+app.use("/api/v1/payments", paymentRoutes);
+app.use("/api/v1/bank-accounts", bankAccountRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -38,7 +51,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = env.PORT;
 
 try {
   await assertDatabaseConnection();
@@ -48,12 +61,22 @@ try {
   process.exit(1);
 }
 
+try {
+  const count = await syncBanksFromPaystack();
+  console.log(`Synced ${count} banks from Paystack.`);
+} catch (err) {
+  console.warn("Could not sync banks from Paystack:", err.message);
+}
+
 const server = app.listen(PORT, () => {
   console.log(`listening on port: ${PORT}`);
 });
 
+const holdSweeper = startHoldSweeper();
+
 async function shutdown(signal) {
   console.log(`\n${signal} received, shutting down...`);
+  holdSweeper.stop();
   server.close();
   await pool.end();
   process.exit(0);
