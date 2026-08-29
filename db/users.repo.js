@@ -65,6 +65,32 @@ export async function updateUser(id, fields) {
   return user;
 }
 
+/**
+ * Update a user's BVN and NIN verification status.
+ * Used by the Dojah verification flow during signup.
+ */
+export async function updateVerificationStatus(id, { ninVerified, bvnVerified }) {
+  const updates = {};
+  if (ninVerified !== undefined) updates.ninVerified = ninVerified;
+  if (bvnVerified !== undefined) updates.bvnVerified = bvnVerified;
+
+  const [user] = await db.update(users).set(updates).where(eq(users.id, id)).returning();
+  return user;
+}
+
+/**
+ * Update a user's driver verification status.
+ * Used by the driver verification endpoint.
+ */
+export async function updateDriverVerificationStatus(id, isVerifiedDriver) {
+  const [user] = await db
+    .update(users)
+    .set({ isVerifiedDriver })
+    .where(eq(users.id, id))
+    .returning();
+  return user;
+}
+
 export async function deleteUser(id) {
   await db.delete(users).where(eq(users.id, id));
 }

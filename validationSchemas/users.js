@@ -9,6 +9,9 @@ const MSG = {
   password:
     "Password must be at least 8 characters and contain both letters and numbers.",
   profilePicture: "Profile picture must be a URL string or null.",
+  nin: "NIN must be exactly 11 digits.",
+  bvn: "BVN must be exactly 11 digits.",
+  selfie: "Selfie must be a valid base64-encoded image string.",
 };
 
 const nameField = (msg) => z.string({ error: msg }).trim().min(2, msg);
@@ -29,6 +32,9 @@ export const registerSchema = z.object({
     .min(8, MSG.password)
     .regex(/^(?=.*[A-Za-z])(?=.*\d)/, MSG.password),
   profilePicture: profilePictureField,
+  nin: z.string({ error: MSG.nin }).regex(/^\d{11}$/, MSG.nin),
+  bvn: z.string({ error: MSG.bvn }).regex(/^\d{11}$/, MSG.bvn),
+  selfie: z.string({ error: MSG.selfie }).min(100, MSG.selfie), // base64 images are typically > 100 chars
 });
 
 export const loginSchema = z.object({
@@ -44,4 +50,9 @@ export const updateProfileSchema = z.object({
   email: emailField.optional(),
   phoneNumber: z.string({ error: MSG.phoneString }).optional(),
   profilePicture: profilePictureField,
+});
+
+export const verifyDriverSchema = z.object({
+  driverLicense: z.string({ error: "Driver license image is required" }).min(100, "Driver license must be a valid base64 image"),
+  selfie: z.string({ error: "Selfie image is required" }).min(100, "Selfie must be a valid base64 image"),
 });

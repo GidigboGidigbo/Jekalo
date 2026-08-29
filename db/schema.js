@@ -16,6 +16,7 @@ export const users = pgTable("users", {
   profilePicture: text("profile_picture"),
   ninVerified: boolean("nin_verified").notNull().default(false),
   bvnVerified: boolean("bvn_verified").notNull().default(false),
+  isVerifiedDriver: boolean("is_verified_driver").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -300,10 +301,11 @@ export const rideCompletionConfirmations = pgTable("ride_completion_confirmation
   id: uuid("id").defaultRandom().primaryKey(),
   rideId: uuid("ride_id").notNull().references(() => rides.id),
   passengerId: uuid("passenger_id").notNull().references(() => users.id),
-  rating: integer("rating").check(sql`rating >= 1 AND rating <= 5`),
+  rating: integer("rating"),
   issueReport: text("issue_report"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 }, (confirmations) => [
+  check("rating_check", sql`rating >= 1 AND rating <= 5`),
   uniqueIndex("ride_confirmation_unique")
     .on(confirmations.rideId, confirmations.passengerId),
   index("ride_confirmation_ride_index").on(confirmations.rideId),

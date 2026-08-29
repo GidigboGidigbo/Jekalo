@@ -42,6 +42,15 @@ router.post(
   "/",
   validate(createRideSchema, "Invalid ride data."),
   async (req, res) => {
+    // Check if user is a verified driver
+    if (!req.user.isVerifiedDriver) {
+      return res.status(403).json({
+        error: {
+          code: "NOT_VERIFIED_DRIVER",
+          message: "You must be a verified driver to create a ride. Please complete driver verification.",
+        },
+      });
+    }
     const ride = await createRide(req.user.id, req.body);
     return res.status(201).json(serializeRide(ride));
   },
