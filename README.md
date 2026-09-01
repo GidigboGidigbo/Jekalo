@@ -134,6 +134,21 @@ Authorization: Bearer <token>
 
 Obtain a token via `POST /users/login`.
 
+### Interactive Documentation
+
+A generated OpenAPI 3.1 spec plus an interactive Scalar reference are served at:
+
+- Reference UI: `/api/v1/docs/reference`
+- Raw spec: `/api/v1/docs/openapi.json`
+
+The spec is assembled statically from `docs/api/*.openapi.js` at runtime (no file
+scanning). When you add or change an endpoint, update the matching module in
+`docs/api/` — register the path with `registry.registerPath(...)` and give each
+named schema a `.openapi("Name", ...)` on the instance you pass to
+`registry.register("Name", ...)`, so responses emit `$ref`s instead of inline
+definitions. `docs/payments-contract.md` is the authoritative money movement
+contract referenced by the payments docs.
+
 ---
 
 ### Users — `/api/v1/users`
@@ -224,7 +239,7 @@ Account numbers are masked at rest (`******7890`). The full number is only used 
 
 | Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `GET` | `/autocomplete` | Yes | Google Places address autocomplete |
+| `GET` | `/search` | Yes | Google Places address search (`?address=` fragment) |
 
 ## Architecture
 
@@ -261,6 +276,13 @@ index.js                    # Express app, route mounting, boot sequence
 ├── middleware/
 │   ├── requireAuth.js         # JWT verification
 │   └── validate.js            # Zod body validation
+├── docs/
+│   ├── registry.js            # Shared OpenAPIRegistry singleton
+│   ├── openapi.js             # Spec assembly (static imports) + buildOpenApiSpec()
+│   ├── scalar.routes.js       # GET /api/v1/docs/{openapi.json,reference}
+│   ├── openapi.tagGroups.js   # Scalar sidebar groups
+│   ├── payments-contract.md   # Money movement contract
+│   └── api/                   # One *.openapi.js per resource
 ├── utils/
 │   ├── paystack.js            # Shared Paystack HTTP client + error class
 │   ├── money.js               # Platform fee computation (1%)

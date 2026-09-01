@@ -15,6 +15,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^8.5.0",
+    "@scalar/express-api-reference": "^0.10.17",
     "bcryptjs": "^3.0.3",
     "cron-time-generator": "^2.0.3",
     "dotenv": "^17.4.2",
