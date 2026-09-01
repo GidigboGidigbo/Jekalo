@@ -1,6 +1,9 @@
 import express from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+// MUST precede the route imports below: it extends Zod with `.openapi()`, and
+// validationSchemas/users.js calls `.openapi` at module evaluation time.
+import "../docs/registry.js";
 import { pool, db } from "../db/index.js";
 import { users, vehicle, rides } from "../db/schema.js";
 import { eq } from "drizzle-orm";

@@ -16,7 +16,9 @@ const emailField = z
   .string({ error: MSG.email })
   .trim()
   .toLowerCase()
-  .pipe(z.email({ error: MSG.email }));
+  .pipe(z.email({ error: MSG.email }))
+  // The pipe is a transformation; give the OpenAPI generator the type it emits.
+  .openapi({ type: "string", format: "email", description: MSG.email, example: "rider@example.com" });
 const profilePictureField = z.url({ error: MSG.profilePicture }).nullish();
 
 export const registerSchema = z.object({

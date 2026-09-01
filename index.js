@@ -1,4 +1,7 @@
 import express from "express";
+// MUST precede the route imports below: it extends Zod with `.openapi()`, and
+// validationSchemas/users.js calls `.openapi` at module evaluation time.
+import "./docs/registry.js";
 import userRoutes from "./routes/users.js";
 import vehicleRoutes from "./routes/vehicles.js";
 import addressRoutes from "./routes/addresses.js";
@@ -10,6 +13,7 @@ import { env } from "./utils/env.js";
 import { startHoldSweeper } from "./services/holds.service.js";
 import { syncBanksFromPaystack } from "./services/banks.service.js";
 import bankAccountRoutes from "./routes/bank_accounts.js";
+import docsRoutes from "./docs/scalar.routes.js";
 
 const app = express();
 
@@ -29,6 +33,12 @@ app.use("/api/v1/rides", rideRoutes);
 app.use("/api/v1/rentals", rentalRoutes);
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/bank-accounts", bankAccountRoutes);
+
+// API reference is interactive documentation, not a route under test — keep it
+// out of the test process so HTTP tests only see the real API surface.
+if (process.env.NODE_ENV !== "test") {
+  app.use("/api/v1/docs", docsRoutes);
+}
 
 app.use((req, res) => {
   res.status(404).json({
