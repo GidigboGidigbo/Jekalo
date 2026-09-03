@@ -5,7 +5,7 @@ function MainDescription() {
   return (
     <Section>
       <p>Reduce transport hassle</p>
-      <p>Commute with Gomyway</p>
+      <p>Commute with Moovquik</p>
     </Section>
   )
 }

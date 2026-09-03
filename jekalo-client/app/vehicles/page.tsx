@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import styled from 'styled-components'
-import { Plus, Trash2, AlertCircle } from 'lucide-react'
+import { Plus, Trash2, AlertCircle, CheckCircle } from 'lucide-react'
 
 type Vehicle = {
   id: string
@@ -22,7 +22,7 @@ type FormState = {
   manufacturingYear: string
   color: string
   bodyType: string
-  pictures: string
+  pictures: File | null
   seatingCapacity: string
   licensePlateNumber: string
 }
@@ -33,7 +33,7 @@ const INITIAL_FORM: FormState = {
   manufacturingYear: '',
   color: '',
   bodyType: '',
-  pictures: '',
+  pictures: null,
   seatingCapacity: '',
   licensePlateNumber: '',
 }
@@ -49,10 +49,16 @@ function Page() {
   const [form, setForm] = useState<FormState>(INITIAL_FORM)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [submitted, setSubmitted] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
+  }
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] || null
+    setForm((prev) => ({ ...prev, pictures: file }))
   }
 
   // TODO: wire up to POST /api/v1/vehicles with validation matching registerVehicleSchema
@@ -65,7 +71,7 @@ function Page() {
     if (!form.manufacturingYear.trim()) newErrors.manufacturingYear = 'Manufacturing year is required.'
     if (!form.color.trim()) newErrors.color = 'Color is required.'
     if (!form.bodyType.trim()) newErrors.bodyType = 'Body type is required.'
-    if (!form.pictures.trim()) newErrors.pictures = 'At least one picture URL is required.'
+    if (!form.pictures) newErrors.pictures = 'A picture is required.'
     if (!form.seatingCapacity || parseInt(form.seatingCapacity) < 1) {
       newErrors.seatingCapacity = 'Seating capacity must be at least 1.'
     }
@@ -78,24 +84,31 @@ function Page() {
 
     setErrors({})
 
-    const newVehicle: Vehicle = {
-      id: `vehicle-${Date.now()}`,
-      make: form.make.trim(),
-      model: form.model.trim(),
-      manufacturingYear: form.manufacturingYear.trim(),
-      color: form.color.trim(),
-      bodyType: form.bodyType.trim(),
-      pictures: form.pictures.split('\n').filter((p) => p.trim()),
-      seatingCapacity: parseInt(form.seatingCapacity),
-      licensePlateNumber: form.licensePlateNumber.trim(),
+    if (form.pictures) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const base64 = event.target?.result as string
+        const newVehicle: Vehicle = {
+          id: `vehicle-${Date.now()}`,
+          make: form.make.trim(),
+          model: form.model.trim(),
+          manufacturingYear: form.manufacturingYear.trim(),
+          color: form.color.trim(),
+          bodyType: form.bodyType.trim(),
+          pictures: [base64],
+          seatingCapacity: parseInt(form.seatingCapacity),
+          licensePlateNumber: form.licensePlateNumber.trim(),
+        }
+
+        setVehicles((prev) => [...prev, newVehicle])
+        setForm(INITIAL_FORM)
+        setShowForm(false)
+        setSubmitted(true)
+
+        setTimeout(() => setSubmitted(false), 3000)
+      }
+      reader.readAsDataURL(form.pictures)
     }
-
-    setVehicles((prev) => [...prev, newVehicle])
-    setForm(INITIAL_FORM)
-    setShowForm(false)
-    setSubmitted(true)
-
-    setTimeout(() => setSubmitted(false), 3000)
   }
 
   function handleDelete(id: string) {
@@ -289,18 +302,30 @@ function Page() {
             </FormField>
 
             <FormField>
-              <label htmlFor="pictures">
-                Pictures (one URL per line)
-              </label>
-              <textarea
-                id="pictures"
-                name="pictures"
-                placeholder="https://example.com/photo1.jpg&#10;https://example.com/photo2.jpg"
-                value={form.pictures}
-                onChange={(e) => setForm((prev) => ({ ...prev, pictures: e.target.value }))}
-                rows={4}
-                required
-              />
+              <label htmlFor="pictures">Car Photo</label>
+              <FileInputWrapper>
+                <input
+                  ref={fileInputRef}
+                  id="pictures"
+                  name="pictures"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  required
+                />
+                <FileInputButton
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  📷 Choose photo
+                </FileInputButton>
+              </FileInputWrapper>
+              {form.pictures && (
+                <UploadedFileInfo>
+                  <CheckCircle size={16} />
+                  {form.pictures.name}
+                </UploadedFileInfo>
+              )}
               {errors.pictures && <FieldError>{errors.pictures}</FieldError>}
             </FormField>
 
@@ -598,6 +623,53 @@ const CancelButton = styled.button`
 
   &:hover {
     background-color: #f5f1eb;
+  }
+`
+
+const FileInputWrapper = styled.div`
+  position: relative;
+
+  input[type='file'] {
+    display: none;
+  }
+`
+
+const FileInputButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 4px;
+  background: cornsilk;
+  cursor: pointer;
+  font-size: 0.95rem;
+  color: brown;
+  border: 1px solid brown;
+  transition: all 0.2s;
+  font-weight: 500;
+
+  &:hover {
+    background: #fff8f0;
+  }
+`
+
+const UploadedFileInfo = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #e8f5e9;
+  border-radius: 4px;
+  border: 1px solid darkgreen;
+  color: darkgreen;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin-top: 4px;
+
+  svg {
+    flex-shrink: 0;
   }
 `
 

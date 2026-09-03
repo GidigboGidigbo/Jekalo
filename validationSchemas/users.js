@@ -32,10 +32,16 @@ export const registerSchema = z.object({
     .min(8, MSG.password)
     .regex(/^(?=.*[A-Za-z])(?=.*\d)/, MSG.password),
   profilePicture: profilePictureField,
-  nin: z.string({ error: MSG.nin }).regex(/^\d{11}$/, MSG.nin),
-  bvn: z.string({ error: MSG.bvn }).regex(/^\d{11}$/, MSG.bvn),
+  nin: z.string({ error: MSG.nin }).regex(/^\d{11}$/, MSG.nin).optional(),
+  bvn: z.string({ error: MSG.bvn }).regex(/^\d{11}$/, MSG.bvn).optional(),
   selfie: z.string({ error: MSG.selfie }).min(100, MSG.selfie), // base64 images are typically > 100 chars
-});
+}).refine(
+  (data) => (data.nin && !data.bvn) || (data.bvn && !data.nin),
+  {
+    message: "Either NIN or BVN must be provided, but not both.",
+    path: ["nin"], // This sets which field the error is associated with
+  }
+);
 
 export const loginSchema = z.object({
   identifier: z

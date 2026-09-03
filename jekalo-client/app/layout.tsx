@@ -2,6 +2,8 @@ import Footer from './Footer'
 import StyledComponentsRegistry from './lib/registry'
 import Navbar from './Navbar'
 import SideBar from '@/components/SideBar'
+import { AuthProvider } from './providers/AuthProvider'
+import { ProtectedRoutes } from './providers/ProtectedRoutes'
 import styled from 'styled-components'
 import "./globals.css"
 
@@ -15,12 +17,16 @@ export default function RootLayout({
     <html>
       <body>
         <StyledComponentsRegistry>
-          <LayoutWrapper>
-            <Navbar />
-            <SideBar />
-            <Main>{children}</Main>
-            <Footer />
-          </LayoutWrapper>
+          <AuthProvider>
+            <ProtectedRoutes>
+              <LayoutWrapper>
+                <Navbar />
+                <SideBar />
+                <Main>{children}</Main>
+                <Footer />
+              </LayoutWrapper>
+            </ProtectedRoutes>
+          </AuthProvider>
         </StyledComponentsRegistry>
       </body>
     </html>

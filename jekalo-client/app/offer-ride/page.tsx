@@ -4,6 +4,8 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import styled from 'styled-components'
 import { AlertCircle } from 'lucide-react'
+import { useAuth } from '@/app/providers/AuthProvider'
+import { RegisterDriver } from '@/components/RegisterDriver'
 
 type FormState = {
   vehicleId: string
@@ -30,9 +32,25 @@ const INITIAL_STATE: FormState = {
 const MOCK_VEHICLES: Array<{ id: string; make: string; model: string; color: string; licensePlate: string }> = []
 
 function Page() {
+  const { user } = useAuth()
   const [form, setForm] = useState<FormState>(INITIAL_STATE)
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({})
   const [submitted, setSubmitted] = useState(false)
+  const [showVerification, setShowVerification] = useState(false)
+
+  // If user is not verified, show the RegisterDriver component
+  if (!user?.isVerifiedDriver) {
+    return (
+      <Wrapper>
+        <RegisterDriver
+          onSuccess={() => setShowVerification(false)}
+          onCancel={() => {
+            // User can navigate away or we can just keep the form hidden
+          }}
+        />
+      </Wrapper>
+    )
+  }
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) {
     const { name, value } = e.target

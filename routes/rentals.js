@@ -27,6 +27,15 @@ router.post(
   "/listings",
   validate(createRentalListingSchema, "Invalid rental listing data."),
   async (req, res) => {
+    // Check if user is a verified driver
+    if (!req.user.isVerifiedDriver) {
+      return res.status(403).json({
+        error: {
+          code: "NOT_VERIFIED_DRIVER",
+          message: "You must be a verified driver to list a rental. Please complete driver verification.",
+        },
+      });
+    }
     const result = await createRentalListing(req.user.id, req.body);
     if (result.reason === "INVALID_DATE_RANGE") {
       return res.status(422).json({

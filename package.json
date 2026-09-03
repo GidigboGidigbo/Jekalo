@@ -15,6 +15,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "axios": "^1.20.0",
     "bcryptjs": "^3.0.3",
     "cron-time-generator": "^2.0.3",
     "dotenv": "^17.4.2",

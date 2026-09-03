@@ -16,6 +16,8 @@ const app = express();
 // Keeps the untouched body around so the Paystack webhook can verify its
 // HMAC signature against exactly what was sent.
 app.use(express.json({
+  // Base64-encoded selfie/license photos exceed the 100kb default.
+  limit: "5mb",
   verify: (req, res, buf) => {
     req.rawBody = buf;
   },

@@ -4,6 +4,8 @@ const DOJAH_APP_ID = process.env.DOJAH_APP_ID;
 const DOJAH_PUBLIC_KEY = process.env.DOJAH_PUBLIC_KEY;
 const DOJAH_SECRET_KEY = process.env.DOJAH_SECRET_KEY;
 const NODE_ENV = process.env.NODE_ENV || "development";
+const DOJAH_SANDBOX_BVN = "22222222222"
+const DOJAH_SANDBOX_NIN = "70123456789"
 
 /**
  * Structured logging utility for Dojah verification.
@@ -29,43 +31,75 @@ const BASE_URL =
     ? "https://api.dojah.io/api/v1"
     : "https://sandbox.dojah.io/api/v1";
 
-const ENDPOINT = "/kyc/nin/verify"; //bvn/verify for bvn
+/**
+ * Strip the data URI prefix from a base64-encoded image if present.
+ * Dojah API expects pure base64 without the "data:image/jpeg;base64," prefix.
+ * 
+ * @param {string} base64Image - Base64-encoded image, possibly with data URI prefix
+ * @returns {string} Pure base64-encoded image
+ */
+function stripBase64Prefix(base64Image) {
+  if (!base64Image) return base64Image;
+  return base64Image.replace(/^data:image\/[^;]+;base64,/, "");
+}
 
 /**
  * Verify a user's BVN/NIN with a selfie using Dojah API.
+ * Uses POST /api/v1/kyc/bvn/verify for BVN or POST /api/v1/kyc/nin/verify for NIN.
  * 
  * @param {Object} params - Verification parameters
- * @param {string} params.bvn - Bank Verification Number (11 digits)
- * @param {string} params.nin - National Identification Number (11 digits)
- * @param {string} params.selfie - Base64-encoded selfie image
+ * @param {string} params.bvn - Bank Verification Number (11 digits) — use if verifying BVN
+ * @param {string} params.nin - National Identification Number (11 digits) — use if verifying NIN
+ * @param {string} params.selfie - Base64-encoded selfie image (with or without data URI prefix)
+ * @param {string} [params.firstName] - Optional first name for NIN verification
+ * @param {string} [params.lastName] - Optional last name for NIN verification
  * 
  * @returns {Object} Verification result { verified: boolean, ninVerified: boolean, bvnVerified: boolean, dojahResponse: Object }
  */
-export async function verifyWithDojah({ bvn, nin, selfie }) {
+export async function verifyWithDojah({ bvn, nin, selfie, firstName, lastName }) {
   const startTime = Date.now();
 
   try {
-    // Log the verification request (with full nin/bvn for debugging)
+    // Determine which endpoint to use based on provided identifier
+    const isBvnVerification = !!bvn && !nin;
+    const isNinVerification = !!nin && !bvn;
+
+    if (!isBvnVerification && !isNinVerification) {
+      throw new Error("Either BVN or NIN must be provided, but not both.");
+    }
+
+    const endpoint = isBvnVerification ? "/kyc/bvn/verify" : "/kyc/nin/verify";
+    const identifier = isBvnVerification ? "bvn" : "nin";
+
+    // Strip data URI prefix from selfie image if present
+    const cleanedSelfie = stripBase64Prefix(selfie);
+
+    // Log the verification request
     logVerification("info", "Dojah verification request initiated", {
-      nin,
-      bvn,
+      identifier,
+      value: isBvnVerification ? bvn : nin,
       selfieMetadata: {
-        size: selfie ? Buffer.byteLength(selfie, "base64") : 0,
-        isBase64: typeof selfie === "string" && selfie.length > 0,
+        size: cleanedSelfie ? Buffer.byteLength(cleanedSelfie, "base64") : 0,
+        isBase64: typeof cleanedSelfie === "string" && cleanedSelfie.length > 0,
       },
       environment: NODE_ENV,
-      endpoint: BASE_URL + ENDPOINT,
+      endpoint: BASE_URL + endpoint,
     });
 
-    // Build request payload
+    // Build request payload based on identifier type
     const payload = {
-      bvn,
-      nin,
-      selfie, // base64-encoded image
+      [identifier]: isBvnVerification ? DOJAH_SANDBOX_BVN : DOJAH_SANDBOX_NIN,
+      selfie_image: cleanedSelfie,
     };
 
+    // Add optional fields for NIN verification
+    if (isNinVerification) {
+      if (firstName) payload.first_name = firstName;
+      if (lastName) payload.last_name = lastName;
+    }
+
     // Make API call to Dojah
-    const response = await axios.post(`${BASE_URL}${ENDPOINT}`, payload, {
+    const response = await axios.post(`${BASE_URL}${endpoint}`, payload, {
       headers: {
         "Content-Type": "application/json",
         "Authorization": DOJAH_SECRET_KEY,
@@ -78,19 +112,26 @@ export async function verifyWithDojah({ bvn, nin, selfie }) {
 
     // Log the successful response
     logVerification("info", "Dojah verification response received", {
-      nin,
-      bvn,
+      identifier,
       statusCode: response.status,
       elapsedTimeMs: elapsedTime,
-      dojahResponse: response.data,
+      entity: response.data?.entity ? {
+        [identifier]: response.data.entity[identifier],
+        selfie_verification: response.data.entity.selfie_verification,
+      } : null,
     });
 
-    // Parse verification results
-    // Note: Adjust field names based on actual Dojah API response structure
-    // TODO: need to adjust this because this isn't what Dojah returns.
-    const verified = response.data?.success === true;
-    const ninVerified = response.data?.data?.nin_verified === true;
-    const bvnVerified = response.data?.data?.bvn_verified === true;
+    // Parse verification results from Dojah response
+    // Response structure: { entity: { bvn/nin: "...", selfie_verification: { match: true, confidence_value: 99.99 } } }
+    const entity = response.data?.entity;
+    if (!entity) {
+      throw new Error("Invalid response from Dojah: missing entity");
+    }
+
+    const selfieVerification = entity.selfie_verification || {};
+    const verified = selfieVerification.match === true;
+    const ninVerified = isNinVerification && verified;
+    const bvnVerified = isBvnVerification && verified;
 
     return {
       verified,
@@ -103,8 +144,6 @@ export async function verifyWithDojah({ bvn, nin, selfie }) {
 
     // Log the error (but don't throw - signup should still succeed in development)
     logVerification("error", "Dojah verification failed", {
-      nin,
-      bvn,
       elapsedTimeMs: elapsedTime,
       errorMessage: error.message,
       errorCode: error.code,

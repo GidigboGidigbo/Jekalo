@@ -69,6 +69,8 @@ router.post(
         nin,
         bvn,
         selfie,
+        firstName,
+        lastName,
       });
 
       // Step 2: Check if verification succeeded
